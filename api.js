@@ -92,7 +92,7 @@ var Api = (function () {
   }
   function boot(s) {
     var total = Object.keys(s.completions).reduce(function (a, k) { return a + s.completions[k].points; }, 0);
-    return { ok: true, demo: true, student: s.student, today: localToday(), completions: s.completions, total: total, rank: rankOf(s), srs: s.srs, admin: false };
+    return { ok: true, demo: true, student: s.student, today: localToday(), completions: s.completions, total: total, rank: rankOf(s), srs: s.srs, admin: qs.has('admin') };
   }
   function mock(a, body) {
     var s = demoState();

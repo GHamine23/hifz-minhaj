@@ -3,7 +3,7 @@
   'use strict';
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var view = $('#view'), AR = '٠١٢٣٤٥٦٧٨٩';
-  function ar(n) { return String(n).replace(/[0-9]/g, function (d) { return AR[d]; }); }
+  function ar(n) { return String(n).replace(/[٠-٩]/g, function (d) { return AR.indexOf(d); }); }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   var MONTHS = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
   var DAYS = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
@@ -56,7 +56,7 @@
     }).join('') + '</div>';
   }
   function filterBar(tk, gk) {
-    return '<div class="filters">' + chips(tk, S[tk], [['', 'كل المسارات']].concat(TRACKS.map(function (t) { return [t, t]; }))) +
+    return '<div class="filters">' + chips(tk, S[tk], [['', 'كل المسارات']].concat(TRACKS.map(function (t) { return [t, ar(t)]; }))) +
       chips(gk, S[gk], [['', 'الكل'], ['ذكر', 'الطلاب'], ['أنثى', 'الطالبات']]) + '</div>';
   }
   function pct(a, b) { return b ? Math.round(100 * a / b) : 0; }
@@ -84,7 +84,7 @@
   function listCard(title, cls, list, sub) {
     return '<section class="card plist"><h2 class="' + cls + '-t">' + title + ' <span class="cnt">' + ar(list.length) + '</span></h2>' +
       (list.length ? '<ul>' + list.map(function (st) {
-        return '<li><button type="button" data-act="student" data-id="' + esc(st.id) + '"><span class="nm">' + esc(st.name) + '</span><span class="mt">' + esc(st.track) + '، ' + (st.gender === 'أنثى' ? 'طالبة' : 'طالب') + '</span><span class="sb">' + sub(st) + '</span></button></li>';
+        return '<li><button type="button" data-act="student" data-id="' + esc(st.id) + '"><span class="nm">' + esc(st.name) + '</span><span class="mt">' + esc(ar(st.track)) + '، ' + (st.gender === 'أنثى' ? 'طالبة' : 'طالب') + '</span><span class="sb">' + sub(st) + '</span></button></li>';
       }).join('') + '</ul>' : '<p class="muted small">لا أحد.</p>') + '</section>';
   }
 
@@ -97,7 +97,7 @@
       .sort(function (a, b) { return b.points - a.points || String(a.name).localeCompare(String(b.name), 'ar'); });
     h += '<p class="muted small">' + ar(list.length) + ' طالبًا</p><section class="card slist"><ul>' + list.map(function (st, i) {
       var m = missedOf(st).length;
-      return '<li><button type="button" data-act="student" data-id="' + esc(st.id) + '"><span class="pos">' + ar(i + 1) + '</span><span class="nm">' + esc(st.name) + '<small>' + esc(st.track) + '، ' + (st.gender === 'أنثى' ? 'طالبة' : 'طالب') + (st.seen ? '، آخر دخول ' + shortDate(String(st.seen).slice(0, 10)) : '') + '</small></span>' +
+      return '<li><button type="button" data-act="student" data-id="' + esc(st.id) + '"><span class="pos">' + ar(i + 1) + '</span><span class="nm">' + esc(st.name) + '<small>' + esc(ar(st.track)) + '، ' + (st.gender === 'أنثى' ? 'طالبة' : 'طالب') + (st.seen ? '، آخر دخول ' + shortDate(String(st.seen).slice(0, 10)) : '') + '</small></span>' +
         '<span class="pts">' + ar(st.points) + '<small>نقطة</small></span>' + (m ? '<span class="chip miss">فاته ' + ar(m) + '</span>' : '<span class="chip ok">منتظم</span>') + '</button></li>';
     }).join('') + '</ul></section>';
     view.innerHTML = h;
@@ -106,10 +106,10 @@
   function studentSheet(id) {
     var st = A.students.filter(function (x) { return String(x.id) === String(id); })[0]; if (!st) return;
     var rows = A.wards.filter(function (w) { return w.date <= st.today; }).map(function (w) {
-      var c = comp(st, w.n), stt = c ? (c.p === 10 ? '<span class="chip ok">تم ١٠</span>' : '<span class="chip late">متأخر ' + ar(c.p) + '</span>') : (w.date === st.today ? '<span class="chip today">اليوم</span>' : '<span class="chip miss">فاته</span>');
+      var c = comp(st, w.n), stt = c ? (c.p === 10 ? '<span class="chip ok">تم، 10</span>' : '<span class="chip late">متأخر ' + ar(c.p) + '</span>') : (w.date === st.today ? '<span class="chip today">اليوم</span>' : '<span class="chip miss">فاته</span>');
       return '<li><span class="d">' + shortDate(w.date) + '</span><span class="t">الورد ' + ar(w.n) + (c ? '<small>' + (RATE[c.r] || '') + '، سجّله ' + shortDate(String(c.d).slice(0, 10)) + '</small>' : '') + '</span>' + stt + '</li>';
     }).join('');
-    sheet('<h2>' + esc(st.name) + '</h2><p class="muted">' + esc(st.track) + '، ' + (st.gender === 'أنثى' ? 'طالبة' : 'طالب') + '، ' + ar(st.points) + ' نقطة' + (st.seen ? '، آخر دخول ' + shortDate(String(st.seen).slice(0, 10)) : '') + '</p><ul class="sched">' + rows + '</ul><button class="btn ghost" type="button" data-act="close">إغلاق</button>');
+    sheet('<h2>' + esc(st.name) + '</h2><p class="muted">' + esc(ar(st.track)) + '، ' + (st.gender === 'أنثى' ? 'طالبة' : 'طالب') + '، ' + ar(st.points) + ' نقطة' + (st.seen ? '، آخر دخول ' + shortDate(String(st.seen).slice(0, 10)) : '') + '</p><ul class="sched">' + rows + '</ul><button class="btn ghost" type="button" data-act="close">إغلاق</button>');
   }
 
   /* ---------- النِّسَب ---------- */
@@ -128,7 +128,7 @@
     h += '<section class="card"><h2>حسب المسار</h2>' + TRACKS.map(function (t) {
       var l = list.filter(function (st) { return st.track === t; }), s = 0, g = 0;
       l.forEach(function (st) { wardsBefore(st).concat(wardToday(st) ? [wardToday(st)] : []).forEach(function (w) { s++; if (comp(st, w.n)) g++; }); });
-      return bar(t, g, s, ar(l.length) + ' طالبًا');
+      return bar(ar(t), g, s, ar(l.length) + ' طالبًا');
     }).join('') + '</section>';
     h += '<section class="card"><h2>حسب الورد</h2>' + ow.map(function (w) {
       var l = list, g = l.filter(function (st) { return comp(st, w.n); }).length;
@@ -146,12 +146,12 @@
       return '<button type="button" class="opt" data-act="seg" data-k="' + k + '" aria-pressed="' + (S.seg === k) + '"><b>' + SEGS[k][0] + ' <span class="cnt">' + ar(n) + '</span></b><span>' + SEGS[k][1] + '</span></button>';
     }).join('') + '</div><p class="lbl">وتضييقها (اختياري)</p>' + filterBar('mtrack', 'mgender') + '</section>';
     h += '<section class="card"><label class="lbl" for="mtext">نص الرسالة</label><textarea id="mtext" rows="6" maxlength="3500" placeholder="اكتب رسالتك هنا…">' + esc(S.text) + '</textarea>' +
-      '<div class="row small muted"><span id="mcount">' + ar(S.text.length) + ' / ٣٥٠٠</span><span>نص عادي بلا تنسيق</span></div></section>';
+      '<div class="row small muted"><span id="mcount">' + ar(S.text.length) + ' / 3500</span><span>نص عادي بلا تنسيق</span></div></section>';
     h += '<section class="card recv"><div class="row"><b>ستصل إلى ' + ar(r.length) + (r.length === 1 ? ' طالب' : ' طالبًا') + '</b>' + (r.length ? '<button type="button" class="link-btn" data-act="who">من هم؟</button>' : '') + '</div>' +
       '<button class="btn wide" type="button" data-act="preview"' + (r.length && S.text.trim() ? '' : ' disabled') + '>معاينة ثم إرسال</button></section>';
     if (A.broadcasts && A.broadcasts.length) {
       h += '<section class="card"><h2>سجل الرسائل</h2><ul class="log">' + A.broadcasts.map(function (b) {
-        return '<li><div class="row small"><b>' + esc(SEGS[b.segment] ? SEGS[b.segment][0] : b.segment) + (b.track ? '، ' + esc(b.track) : '') + (b.gender ? '، ' + esc(b.gender) : '') + '</b><span class="muted">' + esc(fmtTs(b.ts)) + '</span></div><p class="small">' + esc(String(b.text || '').slice(0, 140)) + '</p><p class="muted small">وصلت ' + ar(b.sent || 0) + ' من ' + ar(b.count || 0) + (Number(b.failed) ? '، وتعذّر ' + ar(b.failed) : '') + '</p></li>';
+        return '<li><div class="row small"><b>' + esc(SEGS[b.segment] ? SEGS[b.segment][0] : b.segment) + (b.track ? '، ' + esc(ar(b.track)) : '') + (b.gender ? '، ' + esc(b.gender) : '') + '</b><span class="muted">' + esc(fmtTs(b.ts)) + '</span></div><p class="small">' + esc(String(b.text || '').slice(0, 140)) + '</p><p class="muted small">وصلت ' + ar(b.sent || 0) + ' من ' + ar(b.count || 0) + (Number(b.failed) ? '، وتعذّر ' + ar(b.failed) : '') + '</p></li>';
       }).join('') + '</ul></section>';
     }
     view.innerHTML = h;
@@ -169,7 +169,7 @@
   document.addEventListener('input', function (e) {
     if (e.target.id === 'q') { S.q = e.target.value.trim(); S.qFocus = true; renderStudents(); S.qFocus = false; }
     if (e.target.id === 'mtext') {
-      S.text = e.target.value; $('#mcount').textContent = ar(S.text.length) + ' / ٣٥٠٠';
+      S.text = e.target.value; $('#mcount').textContent = ar(S.text.length) + ' / 3500';
       var pb = $('[data-act=preview]'); if (pb) pb.disabled = !(recipients().length && S.text.trim());
     }
   });
@@ -184,11 +184,11 @@
     else if (a === 'seg') { S.seg = b.dataset.k; render(); }
     else if (a === 'who') {
       var r = recipients();
-      sheet('<h2>المستلمون (' + ar(r.length) + ')</h2><ul class="names">' + r.map(function (st) { return '<li>' + esc(st.name) + '<small>' + esc(st.track) + '</small></li>'; }).join('') + '</ul><button class="btn ghost" type="button" data-act="close">إغلاق</button>');
+      sheet('<h2>المستلمون (' + ar(r.length) + ')</h2><ul class="names">' + r.map(function (st) { return '<li>' + esc(st.name) + '<small>' + esc(ar(st.track)) + '</small></li>'; }).join('') + '</ul><button class="btn ghost" type="button" data-act="close">إغلاق</button>');
     }
     else if (a === 'preview') {
       var rr = recipients();
-      sheet('<h2>تأكيد الإرسال</h2><p>سترسل هذه الرسالة من البوت إلى <b>' + ar(rr.length) + '</b> ' + (rr.length === 1 ? 'طالب' : 'طالبًا') + ' (' + esc(SEGS[S.seg][0]) + (S.mtrack ? '، ' + esc(S.mtrack) : '') + (S.mgender ? '، ' + (S.mgender === 'أنثى' ? 'الطالبات' : 'الطلاب') : '') + ').</p>' +
+      sheet('<h2>تأكيد الإرسال</h2><p>سترسل هذه الرسالة من البوت إلى <b>' + ar(rr.length) + '</b> ' + (rr.length === 1 ? 'طالب' : 'طالبًا') + ' (' + esc(SEGS[S.seg][0]) + (S.mtrack ? '، ' + esc(ar(S.mtrack)) : '') + (S.mgender ? '، ' + (S.mgender === 'أنثى' ? 'الطالبات' : 'الطلاب') : '') + ').</p>' +
         '<div class="tgmsg"><p>' + esc(S.text.trim()).replace(/\n/g, '<br>') + '</p><span class="tgbtn">افتح المنصة</span></div>' +
         '<p class="muted small">لا يمكن سحب الرسالة بعد إرسالها.</p><div class="nav2"><button class="btn ghost" type="button" data-act="close">رجوع</button><button class="btn" type="button" data-act="send" data-n="' + rr.length + '">أرسل الآن</button></div>');
     }

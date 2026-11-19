@@ -4,7 +4,7 @@
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var view = $('#view');
   var AR = '٠١٢٣٤٥٦٧٨٩';
-  function ar(n) { return String(n).replace(/[0-9]/g, function (d) { return AR[d]; }); }
+  function ar(n) { return String(n).replace(/[٠-٩]/g, function (d) { return AR.indexOf(d); }); }   // الأرقام: 1234 (طلب أمين)
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   function ls(k, v) {
     try {
@@ -18,7 +18,7 @@
   function addDays(iso, n) { var d = dObj(iso); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
   function dayName(iso) { return DAYS[dObj(iso).getUTCDay()]; }
   function dateTxt(iso) { var d = dObj(iso); return ar(d.getUTCDate()) + ' ' + MONTHS[d.getUTCMonth()]; }
-  function pagesTxt(p) { return 'ص ' + (p.length > 1 ? ar(p[0]) + '–' + ar(p[p.length - 1]) : ar(p[0])); }
+  function pagesTxt(p) { var a = ar(p[0]), b = ar(p[p.length - 1]); return 'ص ' + (p.length === 1 ? a : p.length === 2 ? a + ' و' + b : a + ' إلى ' + b); }
 
   var D = null;          // البيانات الثابتة: المحتوى والأوراد
   var ME = null;         // بيانات الطالب من الخادم
@@ -170,7 +170,7 @@
   /* ---------- الرئيسية ---------- */
   function statusChip(w) {
     var st = Rules.status(w, today(), done(w.n));
-    return { ontime: '<span class="chip ok">تم +١٠</span>', late: '<span class="chip late">متأخر +٥</span>', missed: '<span class="chip miss">فاتك</span>', today: '<span class="chip today">اليوم</span>', upcoming: '<span class="chip">قادم</span>' }[st];
+    return { ontime: '<span class="chip ok">تم، 10 نقاط</span>', late: '<span class="chip late">متأخر، 5 نقاط</span>', missed: '<span class="chip miss">فاتك</span>', today: '<span class="chip today">اليوم</span>', upcoming: '<span class="chip">قادم</span>' }[st];
   }
   function totalPoints() { return (ME && ME.total) || 0; }
   function renderHome() {
@@ -180,24 +180,23 @@
     var phrase = D.phrases.length ? D.phrases[Math.floor(dObj(t).getTime() / 864e5) % D.phrases.length] : '';
     var h = '';
     if (Api.demo) h += '<p class="demo-flag">نسخة تجريبية: البيانات هنا للتجربة فقط' + (D.unverified ? '، وفيها نص لم يُعتمد بعد' : '') + '.</p>';
-    h += '<div class="hello"><h1>السلام عليكم، ' + esc(ME.student.name) + '</h1><p class="muted">' + esc(ME.student.track) + '، ' + dayName(t) + ' ' + dateTxt(t) + '</p></div>';
-    if (phrase) h += '<p class="motiv">' + esc(phrase) + '</p>';
-    var stk = streak(); if (stk > 1) h += '<p class="streak">🔥 ' + ar(stk) + ' ' + daysWord(stk) + ' متتالية في الحفظ والمراجعة</p>';
-    if (fri) h += '<p class="notice">اليوم يوم الاستدراك: كل ورد فاتك تنجزه اليوم يُحسب بعشر نقاط.</p>';
-    h += '<section class="card today-card"><div class="stack">';
-    if (tw) {
-      var c = chapter(tw.ch);
-      h += '<p class="muted small">مطلوب اليوم</p><h2>الورد ' + ar(tw.n) + '، ' + pagesTxt(tw.pages) + '</h2><p class="muted">' + esc(c.name) + '</p>';
-      h += done(tw.n) ? '<p class="done-line">✓ أنجزت ورد اليوم، ' + RATE[done(tw.n).rating] + '</p><div class="nav2"><a class="btn" href="#session">افتح الورد</a><a class="btn" href="#review">المراجعة</a></div>'
-        : '<div class="nav2"><a class="btn" href="#session">ابدأ الحفظ</a><button class="btn done-btn" type="button" data-act="done" data-n="' + tw.n + '">✓ تم الإنجاز</button></div>';
-    } else if (fri) {
-      h += '<p class="muted small">مطلوب اليوم</p><h2>لا ورد جديد اليوم</h2><p class="muted">الجمعة للمراجعة والاستدراك.</p><a class="btn wide" href="#review">مراجعة كل المحفوظ</a>';
-    } else {
-      var next = D.wards.find(function (w) { return w.date > t; });
-      h += '<p class="muted small">مطلوب اليوم</p><h2>' + (next ? 'الورد القادم ' + dayName(next.date) + ' ' + dateTxt(next.date) : 'أتممت أوراد الحزمة') + '</h2><a class="btn wide" href="#review">المراجعة</a>';
-    }
+    if (ME.admin) h += '<a class="admin-link" href="admin.html"><span aria-hidden="true">🛠</span><b>لوحة الإدارة</b><small>من أنجز ومن لم ينجز، والنِّسَب، والرسائل</small><i aria-hidden="true">←</i></a>';
+    var stk = streak(), c;
+    h += '<section class="card today-card hero">';
+    h += '<div class="hero-top"><b>السلام عليكم، ' + esc(ME.student.name) + '</b><span>' + esc(ar(ME.student.track)) + '، ' + dayName(t) + ' ' + dateTxt(t) + '</span></div>';
+    if (fri) h += '<p class="hero-note">اليوم يوم الاستدراك: كل ورد فاتك تنجزه اليوم يُحسب بعشر نقاط.</p>';
+    h += '<div class="hero-task"><span class="small">المطلوب منك اليوم</span>';
+    if (tw) { c = chapter(tw.ch); h += '<h2>احفظ الورد ' + ar(tw.n) + '، ' + pagesTxt(tw.pages) + '</h2><p>' + esc(c.name) + '</p>'; }
+    else if (fri) h += '<h2>راجع كل ما حفظت</h2><p>لا ورد جديد يوم الجمعة.</p>';
+    else { var next = D.wards.find(function (w) { return w.date > t; }); h += '<h2>' + (next ? 'راجع ما حفظت' : 'أتممت أوراد الحزمة') + '</h2><p>' + (next ? 'لا ورد جديد اليوم. الورد القادم ' + dayName(next.date) + ' ' + dateTxt(next.date) + '.' : 'راجع محفوظك استعدادًا للاختبار.') + '</p>'; }
+    h += '</div>';
+    if (phrase) h += '<blockquote class="hero-quote">' + esc(phrase) + '</blockquote>';
+    if (tw && !done(tw.n)) h += '<div class="nav2"><a class="btn" href="#session">ابدأ الحفظ الآن</a><button class="btn done-btn" type="button" data-act="done" data-n="' + tw.n + '">✓ تم الإنجاز</button></div>';
+    else if (tw) h += '<p class="done-line">✓ أنجزت ورد اليوم، ' + RATE[done(tw.n).rating] + '</p><div class="nav2"><a class="btn" href="#review">ابدأ المراجعة الآن</a><a class="btn hero-2" href="#session">افتح الورد</a></div>';
+    else h += '<a class="btn wide" href="#review">ابدأ المراجعة الآن</a>';
     h += '<div class="progress"><div class="row small"><span>السير: ' + ar(doneN) + ' من ' + ar(D.wards.length) + ' وردًا</span><span>' + ar(totalPoints()) + ' نقطة</span></div><div class="bar"><span style="width:' + Math.round(100 * doneN / D.wards.length) + '%"></span></div></div>';
-    h += '</div></section>';
+    if (stk > 1) h += '<span class="streak-chip">🔥 ' + ar(stk) + ' ' + daysWord(stk) + ' متتالية في الحفظ والمراجعة</span>';
+    h += '</section>';
     if (missed.length) {
       h += '<section class="card"><h2>أوراد فاتتك</h2><ul class="sched">' + missed.map(function (w) {
         return '<li><span class="d">' + dayName(w.date) + '<br>' + dateTxt(w.date) + '</span><span class="t">الورد ' + ar(w.n) + '، ' + pagesTxt(w.pages) + '</span><span class="mini-acts"><a class="btn soft" href="#session-' + w.n + '">افتح</a><button class="btn done-btn" type="button" data-act="done" data-n="' + w.n + '" aria-label="تم إنجاز الورد ' + ar(w.n) + '">✓</button></span></li>';
@@ -215,7 +214,7 @@
   function renderRankCard() {
     var r = ME.rank, tr = S.rankTrack;
     var h = '<section class="card" id="rankCard"><div class="row"><h2>الترتيب</h2><div class="seg" role="group" aria-label="تصفية بالمسار">' +
-      ['', 'إثمار ١', 'إثمار ٢', 'إثمار ٣'].map(function (t) { return '<button type="button" data-act="rank" data-track="' + t + '" aria-pressed="' + (tr === t) + '">' + (t || 'الكل') + '</button>'; }).join('') + '</div></div>';
+      ['', 'إثمار ١', 'إثمار ٢', 'إثمار ٣'].map(function (t) { return '<button type="button" data-act="rank" data-track="' + t + '" aria-pressed="' + (tr === t) + '">' + (ar(t) || 'الكل') + '</button>'; }).join('') + '</div></div>';
     h += '<p class="muted small">أول عشرة في قسم ' + (ME.student.gender === 'أنثى' ? 'الطالبات' : 'الطلاب') + '.</p>';
     h += '<ol class="rank">' + r.top.map(function (x, i) {
       return '<li class="' + (x.me ? 'me' : '') + '"><span class="p">' + ar(i + 1) + '</span><span>' + esc(x.name) + (x.me ? ' (أنت)' : '') + '</span><span class="pts">' + ar(x.points) + '</span></li>';
@@ -244,11 +243,13 @@
     if (!items.length) { view.innerHTML = '<section class="card"><h2>الورد ' + ar(n) + '</h2><p>نص هذا الورد قيد المراجعة، ويظهر هنا قريبًا بإذن الله.</p></section>'; return; }
     S.idx = Math.min(S.idx, items.length - 1);
     S.span = Math.max(1, Math.min(S.span || 1, 3, items.length - S.idx));
+    if (!S.ready) return renderSetup(n, w, c, items);
     var h = '';
     if (S.focus) h += '<div class="focusbar"><span>جلسة تركيز</span><span class="clock" id="clock">' + clockTxt() + '</span><button type="button" data-act="focus-stop">إنهاء</button></div>';
     var scopeName = { item: '', ward: 'الورد كاملًا', chapter: 'الباب كاملًا', book: 'المتن كاملًا' }[S.mode];
     h += '<div class="sess-top hide-in-focus"><div class="sess-title"><span class="crumb">' + esc(c.title) + '، ' + pagesTxt(w.pages) + '</span><h1>الورد ' + ar(n) + (scopeName ? '<small>، ' + scopeName + '</small>' : '') + '</h1></div>' +
-      '<button class="tool-btn" type="button" data-act="tools" aria-label="أدوات الجلسة"><span aria-hidden="true">☰</span>الأدوات</button></div>';
+      '<div class="sess-acts">' + (hasRec(c) ? '<button class="tool-btn" type="button" data-act="rec" data-watch="0"><span aria-hidden="true">🎧</span>التسجيل</button>' : '') +
+      '<button class="tool-btn" type="button" data-act="setup"><span aria-hidden="true">⚙</span>الأدوات</button></div></div>';
     h += '<div class="switch hide-in-focus" role="tablist" aria-label="طريقة العرض">' +
       '<button type="button" role="tab" data-act="sview" data-v="text" aria-selected="' + (S.sview !== 'page') + '">النص</button>' +
       '<button type="button" role="tab" data-act="sview" data-v="page" aria-selected="' + (S.sview === 'page') + '">صفحة الكتاب</button><i aria-hidden="true"></i></div>';
@@ -259,6 +260,40 @@
     view.innerHTML = h;
     if (S.sview === 'page') return initPages(w);
     if (S.mode === 'item') { for (var k = 0; k < S.span; k++) markVisited(n, items[S.idx + k].id); bindSwipe(); }
+  }
+  /* قبل الحفظ: الأدوات كلها ظاهرة، يختار الطالب ما يريد ثم يبدأ */
+  var prefs = ls('prefs') || {};
+  if (prefs.mode) S.mode = prefs.mode; if (prefs.level) S.level = prefs.level; if (prefs.sview) S.sview = prefs.sview;
+  S.focusPick = prefs.focus || 0;
+  function savePrefs() { ls('prefs', { mode: S.mode, level: S.level, sview: S.sview, focus: S.focusPick }); }
+  function wardTarget(items) { var v = targets[items[0].id] || 0; return items.every(function (i) { return (targets[i.id] || 0) === v; }) ? v : -1; }
+  function renderSetup(n, w, c, items) {
+    var lv = LEVELS.filter(function (l) { return l[0] === S.level; })[0], tg = wardTarget(items), pg = S.sview === 'page';
+    var h = '<div class="sess-top"><div class="sess-title"><span class="crumb">' + esc(c.title) + '، ' + pagesTxt(w.pages) + '</span><h1>الورد ' + ar(n) + '</h1></div></div>';
+    h += '<section class="card setup"><div><h2>جهّز جلستك</h2><p class="muted small">اختر ما يناسبك ثم ابدأ، وتغيّره متى شئت من زر «الأدوات».</p></div>';
+    h += '<div class="set-row"><p class="lbl">من أين تحفظ؟</p><div class="switch" role="tablist" aria-label="طريقة العرض">' +
+      '<button type="button" role="tab" data-act="sview" data-v="text" aria-selected="' + !pg + '">النص مكتوبًا</button>' +
+      '<button type="button" role="tab" data-act="sview" data-v="page" aria-selected="' + pg + '">صفحة الكتاب</button><i aria-hidden="true"></i></div></div>';
+    if (!pg) {
+      h += '<div class="set-row"><p class="lbl">ماذا تعرض؟</p><div class="seg" role="group" aria-label="ماذا تعرض">' + [['item', 'عنصرًا عنصرًا'], ['ward', 'الورد كاملًا'], ['chapter', 'الباب كاملًا'], ['book', 'المتن كاملًا']].map(function (m) {
+        return '<button type="button" data-act="mode" data-mode="' + m[0] + '" aria-pressed="' + (S.mode === m[0]) + '">' + m[1] + '</button>';
+      }).join('') + '</div><p class="step-hint">' + { item: 'للحفظ والتكرار، عنصرًا بعد عنصر.', ward: 'لقراءة الورد متصلًا.', chapter: 'ما فُتح من الباب متصلًا.', book: 'كل ما فُتح من المتن.' }[S.mode] + '</p></div>';
+      if (S.mode === 'item') {
+        h += '<div class="set-row"><p class="lbl">مرحلة الحفظ</p><div class="steps" role="group" aria-label="مرحلة الحفظ">' + LEVELS.map(function (l, i) {
+          return '<button type="button" data-act="level" data-level="' + l[0] + '" aria-pressed="' + (S.level === l[0]) + '"><b>' + ar(i + 1) + '</b>' + l[1] + '</button>';
+        }).join('') + '</div><p class="step-hint">' + lv[2] + '</p></div>';
+        h += '<div class="set-row"><p class="lbl">كم مرة تكرّر كل عنصر؟</p><div class="seg" role="group" aria-label="هدف التكرار">' + [0, 3, 5, 10, 20].map(function (v) {
+          return '<button type="button" data-act="tgt-all" data-v="' + v + '" aria-pressed="' + (tg === v) + '">' + (v ? ar(v) + ' مرات' : 'بلا هدف') + '</button>';
+        }).join('') + '</div></div>';
+        h += '<div class="set-row"><p class="lbl">جلسة تركيز</p><div class="seg" role="group" aria-label="مدة التركيز">' + [0, 15, 25, 40].map(function (m) {
+          return '<button type="button" data-act="focus-pick" data-m="' + m + '" aria-pressed="' + (S.focusPick === m) + '">' + (m ? ar(m) + ' دقيقة' : 'بلا مؤقّت') + '</button>';
+        }).join('') + '</div><p class="step-hint">يختفي كل شيء إلا ما تحفظه حتى ينتهي الوقت.</p></div>';
+      }
+    }
+    if (hasRec(c)) h += '<div class="set-row"><p class="lbl">التسجيل الصوتي للباب</p><div class="nav2"><button class="btn soft" type="button" data-act="rec" data-watch="0">🎧 استمع بالصوت</button><button class="btn soft" type="button" data-act="rec" data-watch="1">▶ شاهد المقطع</button></div><p class="step-hint">يبقى يعمل وأنت تحفظ، وتتحكم فيه من الشريط في أعلى الصفحة.</p></div>';
+    h += '<button class="link-btn" type="button" data-act="fc-start" data-deck="ward" data-n="' + n + '">🃏 أو راجع بطاقات هذا الورد</button></section>';
+    h += '<div class="sbar go-bar"><button class="btn wide go-btn" type="button" data-act="setup-go">ابدأ الحفظ ←</button></div>';
+    view.innerHTML = h;
   }
   var RATE = { excellent: 'ممتاز', good: 'جيد', weak: 'يحتاج مراجعة' };
   function renderItemMode(n, items) {
@@ -288,10 +323,10 @@
     if (S.mode === 'item' && S.sview !== 'page') {
       var group = items.slice(S.idx, S.idx + S.span), id = group[0].id, cnt = counts[id] || 0, tgt = targets[id] || 0;
       h += '<div class="sbar-row"><button class="nav-b" type="button" data-act="prev" aria-label="السابق"' + (S.idx ? '' : ' disabled') + '>→</button>' +
-        '<button class="tap" type="button" data-act="count"><span>كرّرت</span><b class="num">' + ar(cnt) + (tgt ? '<small> / ' + ar(tgt) + '</small>' : '') + '</b></button>' +
+        '<button class="tap" type="button" data-act="count"><span>كرّرت</span><b class="num">' + ar(cnt) + (tgt ? '<small> من ' + ar(tgt) + '</small>' : '') + '</b></button>' +
         '<button class="nav-b" type="button" data-act="next" aria-label="التالي"' + (S.idx + S.span < items.length ? '' : ' disabled') + '>←</button></div>';
     }
-    h += d ? '<button class="done-chip" type="button" data-act="done" data-n="' + n + '">✓ أنجزت هذا الورد ' + (d.points === 10 ? '(١٠ نقاط)' : '(' + ar(d.points) + ' نقاط)') + '، ' + RATE[d.rating] + '<small>تعديل</small></button>'
+    h += d ? '<button class="done-chip" type="button" data-act="done" data-n="' + n + '">✓ أنجزت هذا الورد ' + (d.points === 10 ? '(10 نقاط)' : '(' + ar(d.points) + ' نقاط)') + '، ' + RATE[d.rating] + '<small>تعديل</small></button>'
       : '<button class="btn done-btn wide" type="button" data-act="done" data-n="' + n + '">✓ تم الإنجاز</button>';
     return h + '</div>';
   }
@@ -319,7 +354,7 @@
         '<figcaption>' + (mine ? '<b>من ورد اليوم</b>، ' : '') + 'صفحة ' + ar(p) + '</figcaption></figure>';
     }
     h += '</div><div class="pg-tools"><button class="btn ghost" type="button" data-act="pg" data-d="-1">→ السابقة</button><span class="num" id="pgNo"></span><button class="btn ghost" type="button" data-act="pg" data-d="1">التالية ←</button></div>';
-    h += '<p class="muted small center">المس الصفحة لتكبيرها.</p><a class="btn soft wide" href="pack1.pdf" download="حزمة-حفظ-المنهاج-١.pdf">⬇ تنزيل ملف الحزمة كاملًا (PDF)</a>';
+    h += '<p class="muted small center">المس الصفحة لتكبيرها.</p><a class="btn soft wide" href="pack1.pdf" download="حزمة-حفظ-المنهاج-1.pdf">⬇ تنزيل ملف الحزمة كاملًا (PDF)</a>';
     return h;
   }
   function initPages(w) {
@@ -509,7 +544,7 @@
     var practice = !done(c.it.ward);
     var h = '<div class="fc-top"><button class="icon-btn" type="button" data-act="fc-end" aria-label="إنهاء البطاقات">✕</button>' +
       '<div class="fc-prog" role="progressbar" aria-valuemin="0" aria-valuemax="' + F.list.length + '" aria-valuenow="' + F.i + '"><i style="width:' + Math.round(F.i / F.list.length * 100) + '%"></i></div>' +
-      '<span class="num small">' + ar(F.i + 1) + ' / ' + ar(F.list.length) + '</span></div>';
+      '<span class="num small">' + ar(F.i + 1) + ' من ' + ar(F.list.length) + '</span></div>';
     h += '<p class="fc-title">' + esc(F.title) + (practice ? '، تدريب' : '') + (F.timer ? '<span class="fc-time">⏱ <b id="fcTime" class="num">' + elapsed(F.t0) + '</b></span>' : '') + '</p>';
     h += '<div class="fc-stage"><div class="fc fc-enter' + (F.flipped ? ' flipped' : '') + '" id="fc" role="button" tabindex="0" aria-label="بطاقة، المس لقلبها">' +
       '<div class="fc-in"><div class="fc-face fc-front"' + (F.flipped ? ' inert' : '') + '>' + frontHTML(c) + '<div class="fc-hintbox" hidden></div><p class="fc-hint">المس البطاقة لقلبها</p></div>' +
@@ -667,7 +702,7 @@
     h += '<div class="stat-grid">' +
       '<div class="stat"><b>' + ar(totalPoints()) + '</b><span>مجموع نقاطك</span></div>' +
       '<div class="stat"><b>' + ar(ME.rank.me.pos) + '</b><span>موضعك في الترتيب</span></div>' +
-      '<div class="stat"><b>' + ar(comps.length) + ' / ' + ar(D.wards.length) + '</b><span>الأوراد المنجزة</span></div>' +
+      '<div class="stat"><b>' + ar(comps.length) + ' من ' + ar(D.wards.length) + '</b><span>الأوراد المنجزة</span></div>' +
       '<div class="stat"><b>' + ar(onTime) + '</b><span>في وقتها</span></div>' +
       '<div class="stat"><b>' + ar(memorizedItems().length) + '</b><span>العناصر المحفوظة</span></div>' +
       '<div class="stat"><b>🔥 ' + ar(streak()) + '</b><span>أيام متتالية</span></div>' +
@@ -676,7 +711,7 @@
     h += '<section class="card"><h2>نقاط الأوراد</h2><ul class="sched">' + D.wards.filter(function (w) { return opened(w); }).map(function (w) {
       var d = done(w.n);
       return '<li><span class="d">' + dateTxt(w.date) + '</span><span class="t">الورد ' + ar(w.n) + '، ' + pagesTxt(w.pages) + (d ? '<small>تقييمك: ' + RATE[d.rating] + '</small>' : '') + '</span>' + statusChip(w) + '</li>';
-    }).join('') + '</ul><p class="muted small">النقاط: الورد في يومه ١٠، والمتأخر ٥، والاختبار الأسبوعي حتى ٥٠.</p></section>';
+    }).join('') + '</ul><p class="muted small">النقاط: الورد في يومه 10، والمتأخر 5، والاختبار الأسبوعي حتى 50.</p></section>';
     h += renderRankCard();
     view.innerHTML = h;
   }
@@ -695,8 +730,8 @@
   }
   function route() {
     var h = (location.hash || '#home').slice(1), m = h.match(/^session-(\d+)$/);
-    if (m) { if (S.w !== +m[1]) { S.w = +m[1]; S.idx = 0; S.span = 1; S.pg = 0; } setTab('session'); }
-    else if (['home', 'session', 'review', 'stats'].indexOf(h) >= 0) { if (h === 'session' && S.tab !== 'session') { S.w = null; S.idx = 0; S.span = 1; S.pg = 0; } setTab(h); }
+    if (m) { if (S.w !== +m[1]) { S.w = +m[1]; S.idx = 0; S.span = 1; S.pg = 0; S.ready = false; } if (S.tab !== 'session') S.ready = false; setTab('session'); }
+    else if (['home', 'session', 'review', 'stats'].indexOf(h) >= 0) { if (h === 'session' && S.tab !== 'session') { S.w = null; S.idx = 0; S.span = 1; S.pg = 0; S.ready = false; } setTab(h); }
     else setTab('home');
     if (S.tab !== 'session' && S.focus) stopFocus();
     if (S.tab !== 'review') { S.fc = null; S.quiz = null; }
@@ -711,37 +746,31 @@
     var b = e.target.closest('[data-act]'); if (!b || b.disabled) return;
     var a = b.dataset.act, items = S.w ? wardItems(S.w) : [];
     if (a === 'close') { closeSheet(); if (b.tagName === 'A') return; }
-    else if (a === 'level') { S.level = b.dataset.level; render(); }
-    else if (a === 'mode') { S.mode = b.dataset.mode; S.sview = 'text'; closeSheet(); render(); }
+    else if (a === 'level') { S.level = b.dataset.level; savePrefs(); render(); }
+    else if (a === 'mode') { S.mode = b.dataset.mode; S.sview = 'text'; savePrefs(); closeSheet(); render(); }
     else if (a === 'next' || a === 'prev') step(a === 'next' ? 1 : -1);
     else if (a === 'goto') { var gi = +b.dataset.i; S.dir = gi > S.idx ? 'next' : 'prev'; S.idx = gi; S.span = 1; render(); S.dir = null; }
     else if (a === 'span') { S.span = Math.max(1, Math.min(3, S.span + (+b.dataset.d))); render(); }
-    else if (a === 'sview') { S.sview = b.dataset.v; render(); }
+    else if (a === 'sview') { S.sview = b.dataset.v; savePrefs(); render(); }
     else if (a === 'pg') { var bx = $('#pages'), cur = bx && bx.querySelector('[data-p="' + ((S.pg || 16) + (+b.dataset.d)) + '"]'); if (cur) cur.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' }); }
     else if (a === 'zoom') zoomPage(+b.dataset.p);
     else if (a === 'count') {
       items.slice(S.idx, S.idx + S.span).forEach(function (x) { counts[x.id] = (counts[x.id] || 0) + 1; });
       var id = items[S.idx].id; ls('cnt', counts);
       if (targets[id] && counts[id] === targets[id]) toast('بلغت هدفك في التكرار');
-      var tb = $('.sbar .tap b'); if (tb) { tb.innerHTML = ar(counts[id]) + (targets[id] ? '<small> / ' + ar(targets[id]) + '</small>' : ''); b.classList.remove('bump'); void b.offsetWidth; b.classList.add('bump'); }
+      var tb = $('.sbar .tap b'); if (tb) { tb.innerHTML = ar(counts[id]) + (targets[id] ? '<small> من ' + ar(targets[id]) + '</small>' : ''); b.classList.remove('bump'); void b.offsetWidth; b.classList.add('bump'); }
     }
-    else if (a === 'tools') {
-      var cw = chapter(ward(S.w).ch), it0 = items[S.idx];
-      sheet('<h2>أدوات الجلسة</h2><p class="lbl">ماذا تعرض؟</p><div class="opt-grid">' + [['item', 'عنصرًا عنصرًا', 'للحفظ والتكرار'], ['ward', 'الورد كاملًا', 'لقراءته متصلًا'], ['chapter', 'الباب كاملًا', 'ما فُتح من الباب'], ['book', 'المتن كاملًا', 'كل ما فُتح']].map(function (m) {
-        return '<button type="button" class="opt" data-act="mode" data-mode="' + m[0] + '" aria-pressed="' + (S.mode === m[0]) + '"><b>' + m[1] + '</b><span>' + m[2] + '</span></button>';
-      }).join('') + '</div><div class="stack">' +
-        (cw.video ? '<button class="btn soft wide" type="button" data-act="video">▶ مقطع شرح الباب</button>' : '') +
-        '<button class="btn soft wide" type="button" data-act="focus">⏱ جلسة تركيز</button>' +
-        '<button class="btn soft wide" type="button" data-act="fc-start" data-deck="ward" data-n="' + S.w + '">🃏 بطاقات هذا الورد</button></div>' +
-        (S.mode === 'item' && it0 ? '<label class="tgt-row">هدف التكرار لهذا العنصر <input type="number" min="1" max="200" inputmode="numeric" id="tgt" value="' + (targets[it0.id] || '') + '" placeholder="مثلًا ١٠"></label>' : '') +
-        '<button class="btn ghost" type="button" data-act="close">إغلاق</button>');
-    }
+    else if (a === 'setup') { if (S.focus) stopFocus(); S.ready = false; render(); window.scrollTo(0, 0); }
+    else if (a === 'setup-go') { S.ready = true; if (S.focusPick && S.mode === 'item' && S.sview !== 'page') startFocus(S.focusPick); else render(); window.scrollTo(0, 0); }
+    else if (a === 'focus-pick') { S.focusPick = +b.dataset.m; savePrefs(); render(); }
+    else if (a === 'tgt-all') { var tv = +b.dataset.v; items.forEach(function (x) { if (tv) targets[x.id] = tv; else delete targets[x.id]; }); ls('tgt', targets); render(); }
+    else if (a === 'rec') playRec(ward(S.w).ch, b.dataset.watch === '1');
+    else if (a === 'pl-play') { if (PL.a.paused) PL.a.play().catch(plFail); else PL.a.pause(); }
+    else if (a === 'pl-back') PL.a.currentTime = Math.max(0, PL.a.currentTime - 10);
+    else if (a === 'pl-view') { PL.watch = !PL.watch; plPaint(); if (!PL.watch) PL.a.play().catch(function () {}); }
+    else if (a === 'pl-close') plClose();
     else if (a === 'done') doneFlow(+b.dataset.n);
     else if (a === 'done-yes') rateSheet(+b.dataset.n, false);
-    else if (a === 'video') {
-      var c = chapter(ward(S.w).ch);
-      sheet('<h2>مقطع ' + esc(c.title) + '</h2><div class="video-frame"><iframe src="' + esc(c.video.embed) + '" allow="autoplay; fullscreen" allowfullscreen title="مقطع الباب"></iframe></div><a class="btn ghost" href="' + esc(c.video.view) + '" target="_blank" rel="noopener">افتحه في درايف إن لم يعمل هنا</a><button class="btn wide" type="button" data-act="close">إغلاق</button>');
-    }
     else if (a === 'focus') {
       sheet('<h2>جلسة تركيز</h2><p class="muted">يختفي كل شيء إلا العنصر الذي تحفظه حتى ينتهي الوقت.</p><div class="seg" role="group" aria-label="المدة">' + [15, 25, 40].map(function (m) { return '<button type="button" data-act="focus-go" data-m="' + m + '" aria-pressed="' + (m === 25) + '">' + ar(m) + ' دقيقة</button>'; }).join('') + '</div><button class="btn ghost" type="button" data-act="close">إلغاء</button>');
     }
@@ -751,7 +780,7 @@
       var n = +b.dataset.n, wasDone = !!done(n), rating = b.dataset.r;
       document.querySelectorAll('.rates button').forEach(function (x) { x.disabled = true; }); b.classList.add('busy');
       Api.call('complete', { w: n, rating: rating }).then(function (res) {
-        ME = res; if (!wasDone) { srsInit(n, rating); markDay(); }
+        ME = res; wrote = true; saveBoot(); if (!wasDone) { srsInit(n, rating); markDay(); }
         if (S.focus) stopFocus();
         render(); doneSuccess(n, wasDone);
       }).catch(function (err) { document.querySelectorAll('.rates button').forEach(function (x) { x.disabled = false; }); b.classList.remove('busy'); toast(err.message); });
@@ -795,27 +824,102 @@
     }
   });
 
+  /* ---------- التسجيل الصوتي للكتاب ----------
+     الاستماع: ملف الصوت على موقعنا (درايف يمنع تشغيل ملفاته داخل المواقع)، ويبقى يعمل أثناء الحفظ.
+     المشاهدة: مشغّل درايف نفسه داخل الصفحة. */
+  var PL = { ch: 0, watch: false, a: null, drag: false };
+  function mmss(x) { x = Math.max(0, Math.floor(x || 0)); return Math.floor(x / 60) + ':' + String(x % 60).padStart(2, '0'); }
+  function hasRec(c) { return !!(c && c.video && (c.video.audio || c.video.embed)); }
+  function plBuild() {
+    var box = $('#player');
+    box.innerHTML = '<div class="pl-video"></div>' +
+      '<div class="pl-bar"><button type="button" class="pl-main" data-act="pl-play" aria-label="تشغيل">▶</button>' +
+      '<div class="pl-info"><b id="plTitle"></b><div class="pl-seek"><input type="range" id="plSeek" min="0" max="1000" value="0" aria-label="موضع التشغيل"><span class="pl-time" id="plTime"></span></div><a class="pl-err" id="plErr" target="_blank" rel="noopener" hidden>تعذّر التشغيل. افتحه في درايف</a></div>' +
+      '<button type="button" class="pl-btn" data-act="pl-back" aria-label="ارجع عشر ثوانٍ">↺ 10</button>' +
+      '<button type="button" class="pl-btn" data-act="pl-view" id="plView"></button>' +
+      '<button type="button" class="pl-btn pl-x" data-act="pl-close" aria-label="إيقاف التسجيل وإغلاقه">✕</button></div>' +
+      '<audio preload="none"></audio>';
+    var v = PL.a = box.querySelector('audio'), sk = $('#plSeek');
+    function tick() {
+      var d = v.duration || 0;
+      if (!PL.drag) sk.value = d ? Math.round(1000 * v.currentTime / d) : 0;
+      $('#plTime').innerHTML = '<span dir="ltr">' + mmss(v.currentTime) + '</span>' + (d ? ' من <span dir="ltr">' + mmss(d) + '</span>' : '');
+    }
+    v.addEventListener('timeupdate', tick); v.addEventListener('loadedmetadata', tick);
+    v.addEventListener('play', plPaint); v.addEventListener('pause', plPaint); v.addEventListener('ended', plPaint);
+    v.addEventListener('waiting', function () { box.classList.add('loading'); }); v.addEventListener('playing', function () { box.classList.remove('loading'); $('#plErr').hidden = true; });
+    v.addEventListener('error', plFail);
+    sk.addEventListener('input', function () { PL.drag = true; var d = v.duration || 0; if (d) $('#plTime').innerHTML = '<span dir="ltr">' + mmss(d * sk.value / 1000) + '</span> من <span dir="ltr">' + mmss(d) + '</span>'; });
+    sk.addEventListener('change', function () { PL.drag = false; if (v.duration) v.currentTime = v.duration * sk.value / 1000; });
+    if ('mediaSession' in navigator) {
+      try {
+        navigator.mediaSession.setActionHandler('play', function () { v.play(); });
+        navigator.mediaSession.setActionHandler('pause', function () { v.pause(); });
+        navigator.mediaSession.setActionHandler('seekbackward', function () { v.currentTime = Math.max(0, v.currentTime - 10); });
+        navigator.mediaSession.setActionHandler('seekforward', function () { v.currentTime = Math.min(v.duration || 0, v.currentTime + 10); });
+      } catch (e) {}
+    }
+  }
+  function plFail() { var c = chapter(PL.ch); $('#player').classList.remove('loading'); var e = $('#plErr'); if (e && c && c.video) { e.href = c.video.view; e.hidden = false; } }
+  function plPaint() {
+    var box = $('#player'), v = PL.a, c = chapter(PL.ch); if (!v || !c) return;
+    var canListen = !!c.video.audio;
+    if (!canListen) PL.watch = true;
+    box.classList.toggle('watch', PL.watch);
+    var fr = box.querySelector('.pl-video');
+    if (PL.watch) { if (!fr.firstChild) { v.pause(); fr.innerHTML = '<iframe src="' + esc(c.video.embed) + '" allow="autoplay; fullscreen" allowfullscreen title="مقطع ' + esc(c.title) + '"></iframe>'; } }
+    else if (fr.firstChild) fr.innerHTML = '';
+    var pb = box.querySelector('.pl-main'), on = !v.paused && !v.ended;
+    pb.textContent = on ? '❚❚' : '▶'; pb.setAttribute('aria-label', on ? 'إيقاف مؤقت' : 'تشغيل');
+    var vb = $('#plView'); vb.textContent = PL.watch ? '🎧 صوت فقط' : '▶ شاهد'; vb.hidden = !canListen;
+    $('#plTitle').textContent = (PL.watch ? 'مقطع ' : 'التسجيل الصوتي: ') + c.title;
+  }
+  function playRec(chN, watch) {
+    var c = chapter(chN); if (!hasRec(c)) return;
+    if (!PL.a) plBuild();
+    var box = $('#player'), v = PL.a;
+    if (PL.ch !== chN) { PL.ch = chN; box.querySelector('.pl-video').innerHTML = ''; v.pause(); if (c.video.audio) v.src = c.video.audio; else v.removeAttribute('src'); $('#plErr').hidden = true; }
+    PL.watch = watch; box.hidden = false; plPaint();
+    if (!PL.watch) { box.classList.add('loading'); v.play().catch(function () { box.classList.remove('loading'); }); }
+    try { if ('mediaSession' in navigator) navigator.mediaSession.metadata = new MediaMetadata({ title: 'التسجيل الصوتي: ' + c.title, artist: 'حفظ المنهاج', artwork: [{ src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png' }] }); } catch (e) {}
+  }
+  function plClose() { var v = PL.a; if (v) { v.pause(); v.removeAttribute('src'); v.load(); } $('#player .pl-video').innerHTML = ''; PL.ch = 0; $('#player').hidden = true; }
+
   /* ---------- البدء ---------- */
   function gate(msg) {
     var bot = (window.HM_CONFIG || {}).bot;
     view.innerHTML = '<div class="gate"><h1>حفظ المنهاج</h1><p>' + msg + '</p>' + (bot ? '<a class="btn" href="https://t.me/' + esc(bot) + '">افتح البوت</a>' : '') + '</div>';
     document.querySelector('.tabs').hidden = true;
   }
+  /* سرعة الفتح: آخر بيانات الطالب محفوظة في جهازه فتظهر الصفحة فورًا، ثم تُحدَّث من الخادم في الخلفية */
+  var wrote = false;   // إن سجّل الطالب إنجازًا قبل وصول التحديث فلا نكتب فوقه بيانات أقدم
+  function who() {
+    if (Api.demo) return 'demo';
+    try { var u = Telegram.WebApp.initDataUnsafe.user; if (u && u.id) return 'tg' + u.id; } catch (e) {}
+    var a = Api.Auth.get(); return a && a.token ? 'tk' + String(a.token).split('.')[0] : '';
+  }
+  function deviceDay() { var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  function saveBoot() { try { ls('boot', { who: who(), me: ME }); } catch (e) {} }
   function start() {
     Api.Auth.init();
     try { if (window.Telegram && Telegram.WebApp && Telegram.WebApp.initData) { Telegram.WebApp.ready(); Telegram.WebApp.expand(); } } catch (e) {}
     if (!Api.Auth.has()) return gate('ادخل إلى المنصة من بوت المسابقة في تيليجرام، فهو يعطيك رابطك الشخصي.');
-    view.innerHTML = '<p class="muted" style="text-align:center;padding-top:20vh">جارٍ التحميل…</p>';
-    fetch('content.json', { cache: 'no-cache' }).then(function (r) { return r.json(); }).then(function (data) {
-      D = data; window.HM_DATA = D;
-      return Api.call('boot');
-    }).then(function (me) {
-      ME = me;
-      if (me.srs && !Object.keys(srs).length) { srs = me.srs; ls('srs', srs); }
-      route();
+    var id = who(), cb = Api.demo ? null : ls('boot'), cd = ls('content');
+    var quick = !!(cb && cd && id && cb.who === id && cb.me && cb.me.today === (Api.demo ? '' : deviceDay()));
+    if (quick) { D = cd; window.HM_DATA = D; ME = cb.me; route(); }
+    else view.innerHTML = '<p class="muted" style="text-align:center;padding-top:20vh">جارٍ التحميل…</p>';
+    var pc = fetch('content.json', { cache: 'no-cache' }).then(function (r) { return r.json(); }).then(function (data) { window.HM_DATA = data; return data; });
+    var pb = Api.demo ? pc.then(function () { return Api.call('boot'); }) : Api.call('boot');   // المحتوى والبيانات معًا لا واحدًا بعد واحد
+    Promise.all([pc, pb]).then(function (res) {
+      D = res[0]; ls('content', D);
+      if (!wrote) { ME = res[1]; saveBoot(); }
+      if (ME.srs && !Object.keys(srs).length) { srs = ME.srs; ls('srs', srs); }
+      if (!quick) route();
+      else if (S.tab === 'home' || S.tab === 'stats' || (S.tab === 'session' && !S.ready)) render();
     }).catch(function (err) {
-      if (err && err.code === 'auth') gate(esc(err.message || 'افتح المنصة من البوت.'));
-      else gate('تعذّر التحميل. تحقق من اتصالك ثم أعد فتح الصفحة.');
+      if (err && err.code === 'auth') { ls('boot', null); gate(esc(err.message || 'افتح المنصة من البوت.')); }
+      else if (!quick) gate('تعذّر التحميل. تحقق من اتصالك ثم أعد فتح الصفحة.');
+      else toast('تعذّر تحديث بياناتك الآن. تحقق من اتصالك.');
     });
   }
   if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(function () {});

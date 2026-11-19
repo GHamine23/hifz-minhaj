@@ -193,7 +193,7 @@
   function renderRankCard() {
     var r = ME.rank, tr = S.rankTrack;
     var h = '<section class="card" id="rankCard"><div class="row"><h2>الترتيب</h2><div class="seg" role="group" aria-label="تصفية بالمسار">' +
-      ['', 'إثمار ٢', 'إثمار ٣'].map(function (t) { return '<button type="button" data-act="rank" data-track="' + t + '" aria-pressed="' + (tr === t) + '">' + (t || 'الكل') + '</button>'; }).join('') + '</div></div>';
+      ['', 'إثمار ١', 'إثمار ٢', 'إثمار ٣'].map(function (t) { return '<button type="button" data-act="rank" data-track="' + t + '" aria-pressed="' + (tr === t) + '">' + (t || 'الكل') + '</button>'; }).join('') + '</div></div>';
     h += '<p class="muted small">أول عشرة في قسم ' + (ME.student.gender === 'أنثى' ? 'الطالبات' : 'الطلاب') + '.</p>';
     h += '<ol class="rank">' + r.top.map(function (x, i) {
       return '<li class="' + (x.me ? 'me' : '') + '"><span class="p">' + ar(i + 1) + '</span><span>' + esc(x.name) + (x.me ? ' (أنت)' : '') + '</span><span class="pts">' + ar(x.points) + '</span></li>';

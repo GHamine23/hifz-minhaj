@@ -476,7 +476,7 @@
       if (me.srs && !Object.keys(srs).length) { srs = me.srs; ls('srs', srs); }
       route();
     }).catch(function (err) {
-      if (err && err.code === 'auth') gate('انتهت صلاحية رابطك. اطلب رابطًا جديدًا من البوت.');
+      if (err && err.code === 'auth') gate(esc(err.message || 'افتح المنصة من البوت.'));
       else gate('تعذّر التحميل. تحقق من اتصالك ثم أعد فتح الصفحة.');
     });
   }

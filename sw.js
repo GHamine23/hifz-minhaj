@@ -1,5 +1,5 @@
 /* يحفظ ملفات المنصة في الجهاز لتفتح بسرعة. المحتوى يُحدَّث من الشبكة أولًا. */
-var V = 'hm-v1';
+var V = 'hm-v2';
 var CORE = ['./', 'index.html', 'app.css', 'app.js', 'api.js', 'rules.js', 'config.js', 'content.json',
   'fonts/UthmanicHafs_V22.ttf', 'fonts/LotusLotfi-Regular.ttf', 'fonts/LotusLotfi-Bold.ttf',
   'fonts/thmanyahsans-Medium.otf', 'fonts/thmanyahsans-Bold.otf', 'fonts/thmanyahserifdisplay-Bold.otf', 'icons/icon-192.png'];

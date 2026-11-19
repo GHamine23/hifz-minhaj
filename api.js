@@ -56,6 +56,23 @@ var Api = (function () {
     ['متسابق هـ', 'إثمار ٢', 35], ['متسابق و', 'إثمار ٣', 30], ['متسابق ز', 'إثمار ٢', 25], ['متسابق ح', 'إثمار ٣', 20],
     ['متسابق ط', 'إثمار ٢', 20], ['متسابق ي', 'إثمار ٣', 15], ['متسابق ك', 'إثمار ١', 10], ['متسابق ل', 'إثمار ١', 5]
   ];
+  /* بيانات إدارة وهمية ثابتة للتجربة: أسماء مصطنعة لا تخص أحدًا */
+  function demoAdmin() {
+    var D = window.HM_DATA || { wards: [] }, today = localToday() || new Date().toISOString().slice(0, 10);
+    var names = ['متسابق أ', 'متسابق ب', 'متسابق ج', 'متسابق د', 'متسابق هـ', 'متسابق و', 'متسابق ز', 'متسابق ح', 'متسابق ط', 'متسابق ي', 'متسابق ك', 'متسابق ل',
+      'متسابقة أ', 'متسابقة ب', 'متسابقة ج', 'متسابقة د', 'متسابقة هـ', 'متسابقة و', 'متسابقة ز', 'متسابقة ح', 'متسابقة ط', 'متسابقة ي'];
+    var seed = 7; function rnd() { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; }
+    var students = names.map(function (n, i) {
+      var comp = {}, pts = 0, skill = rnd();
+      D.wards.filter(function (w) { return w.date <= today; }).forEach(function (w) {
+        var r = rnd(); if (r > skill + 0.25) return;
+        var late = rnd() < 0.2 && w.date < today, p = late ? 5 : 10;
+        comp[w.n] = { p: p, r: ['excellent', 'good', 'weak'][Math.floor(rnd() * 3)], d: late ? today : w.date }; pts += p;
+      });
+      return { id: String(1001 + i), name: n, track: ['إثمار ١', 'إثمار ٢', 'إثمار ٣'][i % 3], gender: n.indexOf('متسابقة') === 0 ? 'أنثى' : 'ذكر', tz: 'Asia/Riyadh', seen: today, today: today, points: pts, comp: comp, blocked: false };
+    });
+    return { ok: true, today: today, wards: D.wards, chapters: D.chapters, test_date: D.test_date, students: students, broadcasts: store('hm.demolog') || [] };
+  }
   function demoState() {
     var s = store('hm.demo');
     if (!s) {
@@ -95,6 +112,13 @@ var Api = (function () {
         }
         if (a === 'srs') { s.srs = body.srs; store('hm.demo', s); return res({ ok: true }); }
         if (a === 'rank') return res({ ok: true, rank: rankOf(s, body.track) });
+        if (a === 'admin') return res(demoAdmin());
+        if (a === 'admin.send') {
+          var log = store('hm.demolog') || [];
+          log.unshift({ ts: new Date().toISOString(), by: 'تجربة', segment: body.segment, track: body.track, gender: body.gender, count: body.expect, sent: body.expect, failed: 0, text: body.text });
+          store('hm.demolog', log.slice(0, 20));
+          return res({ ok: true, sent: body.expect, failed: 0, blocked: 0 });
+        }
         rej(new Error('أمر غير معروف'));
       }, 150);
     });

@@ -271,3 +271,120 @@ body.focus .top,body.focus .tabs,body.focus .hide-in-focus{display:none!importan
 @media (min-width:700px){.decks{grid-template-columns:repeat(4,minmax(0,1fr))}}
 /* أزرار التقييم تبقى في متناول الإبهام ولو طال النص على ظهر البطاقة */
 #fcCtl:has(.fc-grade){position:sticky;bottom:calc(var(--tabs-h) - 6px + env(safe-area-inset-bottom,0px));z-index:6;background:var(--bg);padding:10px 0 18px;box-shadow:0 -14px 14px -6px var(--bg)}
+
+/* ======================= الإصدار الثاني ======================= */
+.center{text-align:center}
+/* زر «تم الإنجاز» الأخضر في كل مكان */
+.btn.done-btn{background:var(--ok);color:#fff}
+:root[data-theme="dark"] .btn.done-btn{color:#10231a}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .btn.done-btn{color:#10231a}}
+.today-card .btn.done-btn{background:#2f9e62;color:#fff}
+.today-card .nav2 .btn{min-height:48px}
+.done-line{background:rgba(255,255,255,.14);border-radius:12px;padding:8px 12px;font-weight:700}
+.mini-acts{display:flex;gap:6px}
+.mini-acts .btn{padding:6px 12px;min-width:44px}
+.streak{display:inline-flex;align-items:center;gap:6px;align-self:start;background:var(--accent-soft);color:var(--accent-ink);border-radius:999px;padding:4px 14px;font-weight:700;font-size:.88rem}
+.streak-chip{grid-column:1/-1;justify-self:start;background:rgba(255,255,255,.16);color:#fff;border-radius:999px;padding:2px 12px;font-size:.82rem;font-weight:700}
+.motiv{position:relative;padding-inline-start:44px}
+.motiv::before{content:"❝";position:absolute;inset-inline-start:14px;top:6px;font-size:1.6rem;line-height:1;color:var(--primary);opacity:.55}
+
+/* رأس الجلسة */
+.sess-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.sess-title{display:grid;gap:2px;min-width:0}
+.sess-title h1 small{font-size:.9rem;color:var(--ink-2);font-family:var(--font-ui)}
+.tool-btn{flex:none;display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 14px;font-weight:700;font-size:.88rem;color:var(--primary-deep);box-shadow:var(--shadow)}
+.tool-btn span{font-size:1rem;line-height:1}
+/* مفتاح «النص / صفحة الكتاب» */
+.switch{position:relative;display:grid;grid-template-columns:1fr 1fr;background:var(--surface-2);border-radius:14px;padding:4px;isolation:isolate}
+.switch button{position:relative;z-index:1;border:0;background:none;border-radius:11px;padding:8px;font-weight:700;color:var(--ink-2);transition:color .2s}
+.switch button[aria-selected="true"]{color:var(--primary-deep)}
+.switch i{position:absolute;z-index:0;top:4px;bottom:4px;inset-inline-start:4px;width:calc(50% - 4px);background:var(--surface);border-radius:11px;box-shadow:0 1px 3px rgba(87,20,53,.12);transition:transform .28s cubic-bezier(.2,.75,.25,1)}
+.switch button:nth-child(2)[aria-selected="true"] ~ i{transform:translateX(-100%)}
+/* خطوات الحفظ الثلاث */
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;position:relative}
+.steps button{display:flex;align-items:center;justify-content:center;gap:6px;border:1.5px solid var(--line);background:var(--surface);border-radius:14px;padding:8px 4px;font-weight:700;font-size:.88rem;color:var(--ink-2);line-height:1.3}
+.steps button b{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--surface-2);font-size:.78rem;flex:none}
+.steps button[aria-pressed="true"]{border-color:var(--primary);background:var(--primary-soft);color:var(--primary-deep)}
+.steps button[aria-pressed="true"] b{background:var(--primary);color:var(--on-primary)}
+.step-hint{font-size:.82rem;color:var(--ink-2);text-align:center;margin-top:-8px}
+/* بطاقة العنصر */
+.swipe-wrap{overflow-x:clip;margin-inline:-6px;padding:4px 6px 10px}
+.item-card{touch-action:pan-y;border-radius:22px;padding:18px 18px 12px;box-shadow:0 2px 4px rgba(87,20,53,.05),0 12px 30px rgba(87,20,53,.08)}
+.chip-k{background:var(--primary-soft);color:var(--primary-deep);border-radius:999px;padding:1px 12px}
+hr.joint{border:0;border-top:1.5px dashed var(--line);margin:4px 0}
+.span-row{display:flex;flex-wrap:wrap;justify-content:center;gap:4px 16px;border-top:1px solid var(--line);padding-top:8px}
+.link-btn{border:0;background:none;color:var(--primary);font-weight:700;font-size:.88rem;padding:4px 2px}
+.swipe-tip{text-align:center;font-size:.74rem;color:var(--ink-2);margin-top:-8px}
+@media (prefers-reduced-motion: no-preference){
+  .slide-next{animation:slideNext .32s cubic-bezier(.2,.75,.25,1) both}
+  .slide-prev{animation:slidePrev .32s cubic-bezier(.2,.75,.25,1) both}
+  .view.enter > *{animation:rise .32s cubic-bezier(.2,.75,.25,1) both}
+  .view.enter > *:nth-child(2){animation-delay:.03s} .view.enter > *:nth-child(3){animation-delay:.06s} .view.enter > *:nth-child(4){animation-delay:.09s}
+  .sheet-card{animation:sheetUp .3s cubic-bezier(.2,.75,.25,1) both}
+  .sheet{animation:fade .2s ease both}
+}
+@keyframes slideNext{from{opacity:0;transform:translateX(-40px)}to{opacity:1;transform:none}}
+@keyframes slidePrev{from{opacity:0;transform:translateX(40px)}to{opacity:1;transform:none}}
+@keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes sheetUp{from{transform:translateY(40px);opacity:.6}to{transform:none;opacity:1}}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+/* الشريط السفلي الثابت */
+.sbar{position:sticky;bottom:calc(var(--tabs-h) - 6px + env(safe-area-inset-bottom,0px));z-index:6;display:grid;gap:8px;background:var(--bg);padding:10px 0 18px;box-shadow:0 -14px 14px -6px var(--bg)}
+body.focus .sbar{bottom:0}
+.sbar-row{display:grid;grid-template-columns:56px 1fr 56px;gap:8px}
+.nav-b{border:1px solid var(--line);background:var(--surface);border-radius:16px;font-size:1.6rem;line-height:1;color:var(--primary);font-weight:700;min-height:56px}
+.nav-b:disabled{opacity:.35}
+.sbar .tap{border:0;background:var(--primary);color:var(--on-primary);border-radius:16px;display:flex;align-items:center;justify-content:center;gap:12px;font-weight:700;font-size:1.05rem;min-height:56px}
+.sbar .tap b{font-size:1.35rem;background:rgba(255,255,255,.18);border-radius:10px;padding:0 12px;min-width:2.4em}
+.sbar .tap b small{font-size:.8rem;opacity:.85}
+.sbar .tap.bump{animation:bump .25s ease}
+@keyframes bump{50%{transform:scale(.96)}}
+.done-chip{border:0;background:var(--ok-soft);color:var(--ok);border-radius:14px;padding:10px 14px;font-weight:700;display:flex;justify-content:space-between;align-items:center;gap:8px;text-align:start;line-height:1.5}
+.done-chip small{font-weight:700;text-decoration:underline;flex:none}
+/* صفحات الكتاب */
+.pages{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;padding:4px 2px 10px;scrollbar-width:none;outline:none}
+.pages::-webkit-scrollbar{display:none}
+.pg{flex:0 0 86%;scroll-snap-align:center;margin:0;display:grid;gap:6px}
+.pg button{border:1px solid var(--line);padding:0;background:#fff;border-radius:14px;overflow:hidden;box-shadow:var(--shadow);cursor:zoom-in}
+.pg.mine button{border:2px solid var(--accent)}
+.pg img{display:block;width:100%;height:auto}
+.pg figcaption{text-align:center;font-size:.8rem;color:var(--ink-2)}
+.pg figcaption b{color:var(--accent-ink)}
+.pg-tools{display:flex;align-items:center;justify-content:space-between;gap:8px;font-weight:700;font-size:.86rem}
+.pg-tools .btn{padding:8px 12px;font-size:.84rem}
+@media (min-width:700px){.pg{flex-basis:70%}}
+.zoom{position:fixed;inset:0;z-index:60;background:rgba(20,12,16,.94);display:grid;grid-template-rows:auto 1fr}
+.zoom-bar{display:flex;align-items:center;gap:8px;padding:calc(10px + env(safe-area-inset-top,0px)) 12px 10px;color:#fff;font-weight:700}
+.zoom-bar span{flex:1;text-align:center}
+.zoom-bar button{border:0;background:rgba(255,255,255,.14);color:#fff;border-radius:12px;width:44px;height:40px;font-size:1.2rem}
+.zoom-box{overflow:auto;touch-action:pan-x pan-y pinch-zoom;padding:0 8px 16px}
+.zoom-box img{display:block;width:100%;height:auto;margin-inline:auto;background:#fff;border-radius:6px;transition:width .2s}
+/* أوراق السؤال والتقييم والنجاح */
+.ask{display:grid;justify-items:center;text-align:center;gap:4px;padding-top:4px}
+.ask-ico{font-size:2rem}
+.rates{display:grid;gap:8px}
+.rate{display:flex;justify-content:space-between;align-items:center;border:1.5px solid var(--line);background:var(--surface);border-radius:16px;padding:14px 16px;font-size:1.02rem;text-align:start}
+.rate span{font-size:.82rem;color:var(--ink-2);font-weight:500}
+.rate.r-excellent{border-color:var(--ok);background:var(--ok-soft);color:var(--ok)}
+.rate.r-good{border-color:var(--late);background:var(--late-soft);color:var(--late)}
+.rate.r-weak{border-color:var(--miss);background:var(--miss-soft);color:var(--miss)}
+.rate.busy{opacity:.6}
+.win .fc-ring{margin-bottom:4px}
+.pts-big{font-family:var(--font-head);font-size:2.4rem;color:var(--ok);line-height:1.2}
+.pts-big small{font-size:1rem}
+.lbl{font-weight:700;font-size:.88rem;color:var(--ink-2)}
+.opt-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.opt{display:grid;gap:0;text-align:start;border:1.5px solid var(--line);background:var(--surface);border-radius:14px;padding:10px 12px;line-height:1.5}
+.opt span{font-size:.76rem;color:var(--ink-2)}
+.opt[aria-pressed="true"]{border-color:var(--primary);background:var(--primary-soft);color:var(--primary-deep)}
+.tgt-row{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--surface-2);border-radius:14px;padding:8px 12px;font-weight:700;font-size:.9rem}
+.tgt-row input{width:6em;border:1px solid var(--line);border-radius:10px;padding:6px 8px;background:var(--surface);text-align:center}
+/* الاختبار */
+.opts-2{grid-template-columns:1fr 1fr}
+.opts button.qopt{font-family:var(--font-quran);font-size:1.3rem;text-align:center}
+.opts-2 button{text-align:center;font-family:var(--font-text);font-size:1.15rem}
+.fc-time{display:inline-flex;gap:4px;margin-inline-start:10px;background:var(--accent-soft);color:var(--accent-ink);border-radius:999px;padding:0 10px}
+.zoom{background:#140c10}
+.sheet-card:focus{outline:none}
+.blank{display:inline-block;min-width:4.2em;height:1.1em;vertical-align:-.15em;border-bottom:2.5px solid var(--accent);background:var(--accent-soft);border-radius:6px 6px 0 0;margin-inline:4px}
+.blank.ok{min-width:0;height:auto;padding:0 6px;color:var(--ok);background:var(--ok-soft);border-color:var(--ok)}

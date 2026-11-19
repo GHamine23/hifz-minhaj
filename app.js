@@ -22,7 +22,7 @@
 
   var D = null;          // البيانات الثابتة: المحتوى والأوراد
   var ME = null;         // بيانات الطالب من الخادم
-  var S = { tab: 'home', w: null, idx: 0, seg: 0, level: 'full', mode: 'item', focus: null, review: null, quiz: null, rankTrack: '' };
+  var S = { tab: 'home', w: null, idx: 0, span: 1, level: 'full', mode: 'item', sview: 'text', focus: null, quiz: null, rankTrack: '' };
 
   /* ---------- الوضع الداكن ---------- */
   var root = document.documentElement, themeBtn = $('#themeBtn');
@@ -34,7 +34,7 @@
   /* ---------- أدوات عامة ---------- */
   var toastT;
   function toast(msg) { var t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(function () { t.hidden = true; }, 2600); }
-  function sheet(html) { $('#sheetBody').innerHTML = html; $('#sheet').hidden = false; var f = $('#sheetBody button, #sheetBody a'); if (f) f.focus(); }
+  function sheet(html) { $('#sheetBody').innerHTML = html; $('#sheet').hidden = false; var c = $('.sheet-card'); c.setAttribute('tabindex', '-1'); c.focus({ preventScroll: true }); }
   function closeSheet() { $('#sheet').hidden = true; $('#sheetBody').innerHTML = ''; }
   $('#sheet').addEventListener('click', function (e) { if (e.target.id === 'sheet') closeSheet(); });
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !$('#sheet').hidden) closeSheet(); });
@@ -52,7 +52,8 @@
   var MARKS = /[ؐ-ًؚ-ٰٟۖ-ۭ]/;
   var NONJOIN = 'اأإآٱدذرزوؤءةى';
   function firstOf(w) {
-    var m = w.match(/^([«(\[﴿"]*)(.*?)([»)\]﴾،.:؛؟!"]*)$/);
+    var m = w.match(/^([«(\[﴿"]*)([\s\S]*?)([»)\]﴾،.:؛؟!"]*)$/);
+    if (!m) return w;
     var pre = m[1], core = m[2], post = m[3];
     if (!core || /^[٠-٩]+$/.test(core) || core.length < 2) return w;
     var out = core[0], i = 1;
@@ -73,7 +74,7 @@
   }
   function fmt(text, level) {
     return parts(text).map(function (p) {
-      var t = level === 'first' ? p.t.split(' ').map(firstOf).join(' ') : p.t;
+      var t = level === 'first' ? p.t.split(/(\s+)/).map(function (x) { return /^\s*$/.test(x) ? x : firstOf(x); }).join('') : p.t;   // يحفظ فواصل الأسطر
       return p.q ? '<span class="q">' + esc(t) + '</span>' : esc(t);
     }).join('');
   }
@@ -96,19 +97,20 @@
     return '<div class="line"><span class="lb">' + label + '</span><div class="tx ' + (cls || '') + (hide ? ' hide' : '') + '" data-reveal="' + key + '"' +
       (hide ? ' role="button" tabindex="0" aria-label="مخفي، المس للإظهار"' : '') + '>' + html + '</div></div>';
   }
-  function itemBody(it, level, segIdx) {
+  function itemBody(it, level, segIdx, gk) {
+    var g = gk ? String(gk) : '';
     if (it.type === 'ayah') {
-      var hide = level === 'hide' && !(S.revealed && S.revealed.q);
+      var hide = level === 'hide' && !(S.revealed && S.revealed['q' + g]);
       return '<p class="quran-intro">' + esc(it.intro) + '</p>' +
-        '<p class="quran' + (hide ? ' hide' : '') + '" data-reveal="q"' + (hide ? ' role="button" tabindex="0" aria-label="مخفي، المس للإظهار"' : '') + '>﴿' + fmt(it.text, level) + '﴾</p>' +
+        '<p class="quran' + (hide ? ' hide' : '') + '" data-reveal="q' + g + '"' + (hide ? ' role="button" tabindex="0" aria-label="مخفي، المس للإظهار"' : '') + '>﴿' + fmt(it.text, level) + '﴾</p>' +
         '<p class="quran-ref">' + esc(it.ref_text) + '</p>';
     }
-    if (it.type === 'note') return lineHTML('فائدة', fmt(it.text, level), '', level, 'n');
+    if (it.type === 'note') return lineHTML('فائدة', fmt(it.text, level), '', level, 'n' + g);
     var segs = segments(it.matn), matn = segs.length > 1 && segIdx != null ? segs[segIdx] : it.matn;
     var lead = segIdx ? '' : (it.lead ? '<span class="lead">' + esc(it.lead) + '</span> ' : '');
-    return lineHTML('الراوي', fmt(it.narrator, level), '', level, 'r') +
-      lineHTML('الحديث', lead + fmt(matn, level), 'matn', level, 'm') +
-      lineHTML('المصدر', fmt(it.source, level), '', level, 's');
+    return lineHTML('الراوي', fmt(it.narrator, level), '', level, 'r' + g) +
+      lineHTML('الحديث', lead + fmt(matn, level), 'matn', level, 'm' + g) +
+      lineHTML('المصدر', fmt(it.source, level), '', level, 's' + g);
   }
   function itemLabel(it) {
     if (it.type === 'ayah') return 'آية';
@@ -126,6 +128,18 @@
   var srs = ls('srs') || {};
   var syncT;
   function saveSrs() { ls('srs', srs); clearTimeout(syncT); syncT = setTimeout(function () { Api.call('srs', { srs: srs }).catch(function () {}); }, 2500); }
+  /* سلسلة الأيام المتتالية: كل يوم راجع فيه الطالب أو أنجز وردًا */
+  function markDay() {
+    var d = srs['@days'] || [];
+    if (d.indexOf(today()) < 0) { d.push(today()); srs['@days'] = d.slice(-60); saveSrs(); }
+  }
+  function streak() {
+    var d = srs['@days'] || [], n = 0, x = today();
+    if (d.indexOf(x) < 0) x = addDays(x, -1);                 // من لم يراجع اليوم بعدُ تبقى سلسلته حتى آخر يومه
+    while (d.indexOf(x) >= 0) { n++; x = addDays(x, -1); }
+    return n;
+  }
+  function daysWord(n) { return n === 1 ? 'يوم' : n === 2 ? 'يومان' : n <= 10 ? 'أيام' : 'يومًا'; }
   function srsInit(n, rating) {
     wardItems(n).forEach(function (it) {
       if (srs[it.id]) return;
@@ -137,6 +151,7 @@
   function srsGrade(id, ok) {
     var r = srs[id] || { lvl: 0 };
     r.lvl = ok ? Math.min(r.lvl + 1, INT.length - 1) : 0;
+    if (!ok) r.lap = (r.lap || 0) + 1;
     r.due = dueBy(addDays(today(), ok ? INT[r.lvl] : 1));
     r.last = today();
     srs[id] = r; saveSrs();
@@ -167,12 +182,14 @@
     if (Api.demo) h += '<p class="demo-flag">نسخة تجريبية: البيانات هنا للتجربة فقط' + (D.unverified ? '، وفيها نص لم يُعتمد بعد' : '') + '.</p>';
     h += '<div class="hello"><h1>السلام عليكم، ' + esc(ME.student.name) + '</h1><p class="muted">' + esc(ME.student.track) + '، ' + dayName(t) + ' ' + dateTxt(t) + '</p></div>';
     if (phrase) h += '<p class="motiv">' + esc(phrase) + '</p>';
+    var stk = streak(); if (stk > 1) h += '<p class="streak">🔥 ' + ar(stk) + ' ' + daysWord(stk) + ' متتالية في الحفظ والمراجعة</p>';
     if (fri) h += '<p class="notice">اليوم يوم الاستدراك: كل ورد فاتك تنجزه اليوم يُحسب بعشر نقاط.</p>';
     h += '<section class="card today-card"><div class="stack">';
     if (tw) {
       var c = chapter(tw.ch);
       h += '<p class="muted small">مطلوب اليوم</p><h2>الورد ' + ar(tw.n) + '، ' + pagesTxt(tw.pages) + '</h2><p class="muted">' + esc(c.name) + '</p>';
-      h += done(tw.n) ? '<a class="btn wide" href="#session">أنجزت ورد اليوم، راجعه</a>' : '<a class="btn wide" href="#session">إنجاز ورد اليوم</a>';
+      h += done(tw.n) ? '<p class="done-line">✓ أنجزت ورد اليوم، ' + RATE[done(tw.n).rating] + '</p><div class="nav2"><a class="btn" href="#session">افتح الورد</a><a class="btn" href="#review">المراجعة</a></div>'
+        : '<div class="nav2"><a class="btn" href="#session">ابدأ الحفظ</a><button class="btn done-btn" type="button" data-act="done" data-n="' + tw.n + '">✓ تم الإنجاز</button></div>';
     } else if (fri) {
       h += '<p class="muted small">مطلوب اليوم</p><h2>لا ورد جديد اليوم</h2><p class="muted">الجمعة للمراجعة والاستدراك.</p><a class="btn wide" href="#review">مراجعة كل المحفوظ</a>';
     } else {
@@ -183,7 +200,7 @@
     h += '</div></section>';
     if (missed.length) {
       h += '<section class="card"><h2>أوراد فاتتك</h2><ul class="sched">' + missed.map(function (w) {
-        return '<li><span class="d">' + dayName(w.date) + '<br>' + dateTxt(w.date) + '</span><span class="t">الورد ' + ar(w.n) + '، ' + pagesTxt(w.pages) + '</span><a class="btn soft" style="padding:6px 12px" href="#session-' + w.n + '">استدرك</a></li>';
+        return '<li><span class="d">' + dayName(w.date) + '<br>' + dateTxt(w.date) + '</span><span class="t">الورد ' + ar(w.n) + '، ' + pagesTxt(w.pages) + '</span><span class="mini-acts"><a class="btn soft" href="#session-' + w.n + '">افتح</a><button class="btn done-btn" type="button" data-act="done" data-n="' + w.n + '" aria-label="تم إنجاز الورد ' + ar(w.n) + '">✓</button></span></li>';
       }).join('') + '</ul></section>';
     }
     h += renderRankCard();
@@ -213,6 +230,12 @@
   var counts = ls('cnt') || {}, targets = ls('tgt') || {};
   function wardCount(n) { return wardItems(n).reduce(function (a, i) { return a + (counts[i.id] || 0); }, 0); }
 
+  /* درجات الحفظ الثلاث بأسماء تشرح نفسها، مرتّبة كخطوات */
+  var LEVELS = [
+    ['full', 'اقرأ', 'النص كاملًا أمامك: اقرأه وكرّره حتى تألفه.'],
+    ['first', 'بالتلميح', 'يظهر أول حرف من كل كلمة، وتستحضر أنت بقيتها.'],
+    ['hide', 'سمّع غيبًا', 'النص مخفي: سمّع من حفظك، والمس أي سطر لتتحقق منه.']
+  ];
   function renderSession() {
     var n = S.w || (todayWard() && todayWard().n) || (D.wards.filter(opened).slice(-1)[0] || D.wards[0]).n;
     S.w = n;
@@ -220,51 +243,57 @@
     if (!opened(w)) { view.innerHTML = '<section class="card"><h2>الورد ' + ar(n) + '</h2><p>يُفتح هذا الورد يوم ' + dayName(w.date) + ' ' + dateTxt(w.date) + '.</p><a class="btn" href="#home">الرئيسية</a></section>'; return; }
     if (!items.length) { view.innerHTML = '<section class="card"><h2>الورد ' + ar(n) + '</h2><p>نص هذا الورد قيد المراجعة، ويظهر هنا قريبًا بإذن الله.</p></section>'; return; }
     S.idx = Math.min(S.idx, items.length - 1);
+    S.span = Math.max(1, Math.min(S.span || 1, 3, items.length - S.idx));
     var h = '';
     if (S.focus) h += '<div class="focusbar"><span>جلسة تركيز</span><span class="clock" id="clock">' + clockTxt() + '</span><button type="button" data-act="focus-stop">إنهاء</button></div>';
-    h += '<div class="sess-head hide-in-focus"><span class="crumb">' + esc(c.title) + '، ' + pagesTxt(w.pages) + '</span><h1>الورد ' + ar(n) + '</h1>' +
-      '<div class="seg" role="group" aria-label="طريقة العرض">' + [['item', 'عنصرًا عنصرًا'], ['ward', 'الورد كاملًا'], ['chapter', 'الباب كاملًا'], ['book', 'المتن كاملًا']].map(function (m) {
-        return '<button type="button" data-act="mode" data-mode="' + m[0] + '" aria-pressed="' + (S.mode === m[0]) + '">' + m[1] + '</button>';
-      }).join('') + '</div></div>';
-    h += '<div class="tools hide-in-focus">' + (c.video ? '<button class="btn ghost" type="button" data-act="video">مقطع الباب</button>' : '') +
-      '<button class="btn ghost" type="button" data-act="focus">جلسة تركيز</button>' +
-      '<button class="btn ghost" type="button" data-act="fc-start" data-deck="ward" data-n="' + n + '">بطاقات الورد</button></div>';
-    if (S.mode === 'item') h += renderItemMode(n, items);
+    var scopeName = { item: '', ward: 'الورد كاملًا', chapter: 'الباب كاملًا', book: 'المتن كاملًا' }[S.mode];
+    h += '<div class="sess-top hide-in-focus"><div class="sess-title"><span class="crumb">' + esc(c.title) + '، ' + pagesTxt(w.pages) + '</span><h1>الورد ' + ar(n) + (scopeName ? '<small>، ' + scopeName + '</small>' : '') + '</h1></div>' +
+      '<button class="tool-btn" type="button" data-act="tools" aria-label="أدوات الجلسة"><span aria-hidden="true">☰</span>الأدوات</button></div>';
+    h += '<div class="switch hide-in-focus" role="tablist" aria-label="طريقة العرض">' +
+      '<button type="button" role="tab" data-act="sview" data-v="text" aria-selected="' + (S.sview !== 'page') + '">النص</button>' +
+      '<button type="button" role="tab" data-act="sview" data-v="page" aria-selected="' + (S.sview === 'page') + '">صفحة الكتاب</button><i aria-hidden="true"></i></div>';
+    if (S.sview === 'page') h += renderPages(w);
+    else if (S.mode === 'item') h += renderItemMode(n, items);
     else h += renderFull(S.mode, n);
-    var d = done(n), seen = visited(n), all = items.every(function (i) { return seen.indexOf(i.id) >= 0; });
-    h += '<section class="card flat hide-in-focus"><div class="row"><span class="muted small">مجموع تكرارك في هذا الورد</span><b class="num">' + ar(wardCount(n)) + '</b></div>';
-    if (d) {
-      h += '<p class="done-box">أنجزت هذا الورد ' + (d.points === 10 ? 'في وقته (١٠ نقاط)' : '(٥ نقاط)') + '، تقييمك: ' + RATE[d.rating] + '</p>' +
-        '<div class="nav2"><button class="btn soft" type="button" data-act="recite">عدّل التقييم</button><a class="btn" href="#review">المراجعة المقترحة</a></div>';
-    } else {
-      h += '<button class="btn wide" type="button" data-act="recite"' + (all ? '' : ' disabled') + '>سمّعت</button>' +
-        (all ? '' : '<p class="muted small" style="text-align:center">يتفعّل بعد المرور على عناصر الورد كلها (' + ar(seen.filter(function (id) { return items.some(function (i) { return i.id === id; }); }).length) + ' من ' + ar(items.length) + ').</p>');
-    }
-    h += '</section>';
+    h += sessionBar(n, items);
     view.innerHTML = h;
-    if (S.mode === 'item') markVisited(n, items[S.idx].id);
+    if (S.sview === 'page') return initPages(w);
+    if (S.mode === 'item') { for (var k = 0; k < S.span; k++) markVisited(n, items[S.idx + k].id); bindSwipe(); }
   }
   var RATE = { excellent: 'ممتاز', good: 'جيد', weak: 'يحتاج مراجعة' };
   function renderItemMode(n, items) {
-    var it = items[S.idx], segs = it.type === 'hadith' ? segments(it.matn) : [it.text];
-    var segIdx = segs.length > 1 ? Math.min(S.seg, segs.length - 1) : null;
-    var seen = visited(n);
-    var h = '<section class="card item-card">';
-    h += '<div class="item-meta"><span>' + itemLabel(it) + '</span><span>' + ar(S.idx + 1) + ' من ' + ar(items.length) + '</span></div>';
-    h += '<div class="seg" role="group" aria-label="درجة البطاقة">' + [['full', 'كامل'], ['first', 'أوائل الكلمات'], ['hide', 'مخفي']].map(function (l) {
-      return '<button type="button" data-act="level" data-level="' + l[0] + '" aria-pressed="' + (S.level === l[0]) + '">' + l[1] + '</button>';
-    }).join('') + '</div>';
-    if (segIdx != null) h += '<div class="segnav"><button type="button" data-act="seg" data-d="-1" aria-label="المقطع السابق">›</button><span>المقطع ' + ar(segIdx + 1) + ' من ' + ar(segs.length) + '</span><button type="button" data-act="seg" data-d="1" aria-label="المقطع التالي">‹</button></div>';
-    h += itemBody(it, S.level, segIdx);
-    if (S.level === 'hide') h += '<p class="reveal-hint">المس السطر المخفي ليظهر.</p>';
-    var cnt = counts[it.id] || 0, tgt = targets[it.id] || '';
-    h += '<div class="counter"><div><div class="c">التكرار: ' + ar(cnt) + (tgt ? ' من ' + ar(tgt) : '') + '</div><label class="tgt">هدفي <input type="number" min="1" max="200" inputmode="numeric" id="tgt" value="' + tgt + '" aria-label="عدد التكرار الذي تريده لهذا العنصر"></label></div><button class="tap" type="button" data-act="count">كرّرت</button></div>';
-    h += '</section>';
-    h += '<div class="nav2"><button class="btn soft" type="button" data-act="prev"' + (S.idx ? '' : ' disabled') + '>السابق</button><button class="btn soft" type="button" data-act="next"' + (S.idx < items.length - 1 ? '' : ' disabled') + '>التالي</button></div>';
+    var group = items.slice(S.idx, S.idx + S.span), seen = visited(n), lv = LEVELS.filter(function (l) { return l[0] === S.level; })[0];
+    var h = '<div class="steps hide-in-focus" role="group" aria-label="مرحلة الحفظ">' + LEVELS.map(function (l, i) {
+      return '<button type="button" data-act="level" data-level="' + l[0] + '" aria-pressed="' + (S.level === l[0]) + '"><b>' + ar(i + 1) + '</b>' + l[1] + '</button>';
+    }).join('') + '</div><p class="step-hint hide-in-focus">' + lv[2] + '</p>';
+    h += '<div class="swipe-wrap"><section class="card item-card slide-' + (S.dir || 'none') + '" id="itemCard">';
+    group.forEach(function (it, k) {
+      if (k) h += '<hr class="joint">';
+      h += '<div class="item-meta"><span class="chip-k">' + itemLabel(it) + '</span><span>' + ar(S.idx + k + 1) + ' من ' + ar(items.length) + '</span></div>';
+      h += itemBody(it, S.level, null, k);
+    });
+    var nx = items[S.idx + S.span];
+    h += '<div class="span-row hide-in-focus">' +
+      (nx && S.span < 3 ? '<button type="button" class="link-btn" data-act="span" data-d="1">＋ أضف ' + (nx.type === 'ayah' ? 'الآية التالية' : nx.type === 'note' ? 'الفائدة التالية' : 'الحديث التالي') + ' إلى العرض</button>' : '') +
+      (S.span > 1 ? '<button type="button" class="link-btn" data-act="span" data-d="-1">− أزل الأخير</button>' : '') + '</div>';
+    h += '</section></div>';
     h += '<div class="dots hide-in-focus" aria-label="عناصر الورد">' + items.map(function (x, i) {
-      return '<button type="button" data-act="goto" data-i="' + i + '" class="' + (i === S.idx ? 'cur' : seen.indexOf(x.id) >= 0 ? 'seen' : '') + '" aria-label="العنصر ' + ar(i + 1) + '"></button>';
-    }).join('') + '</div>';
+      var cur = i >= S.idx && i < S.idx + S.span;
+      return '<button type="button" data-act="goto" data-i="' + i + '" class="' + (cur ? 'cur' : seen.indexOf(x.id) >= 0 ? 'seen' : '') + '" aria-label="العنصر ' + ar(i + 1) + '"></button>';
+    }).join('') + '</div><p class="swipe-tip hide-in-focus">اسحب البطاقة يمينًا ويسارًا للتنقّل</p>';
     return h;
+  }
+  function sessionBar(n, items) {
+    var d = done(n), h = '<div class="sbar">';
+    if (S.mode === 'item' && S.sview !== 'page') {
+      var group = items.slice(S.idx, S.idx + S.span), id = group[0].id, cnt = counts[id] || 0, tgt = targets[id] || 0;
+      h += '<div class="sbar-row"><button class="nav-b" type="button" data-act="prev" aria-label="السابق"' + (S.idx ? '' : ' disabled') + '>→</button>' +
+        '<button class="tap" type="button" data-act="count"><span>كرّرت</span><b class="num">' + ar(cnt) + (tgt ? '<small> / ' + ar(tgt) + '</small>' : '') + '</b></button>' +
+        '<button class="nav-b" type="button" data-act="next" aria-label="التالي"' + (S.idx + S.span < items.length ? '' : ' disabled') + '>←</button></div>';
+    }
+    h += d ? '<button class="done-chip" type="button" data-act="done" data-n="' + n + '">✓ أنجزت هذا الورد ' + (d.points === 10 ? '(١٠ نقاط)' : '(' + ar(d.points) + ' نقاط)') + '، ' + RATE[d.rating] + '<small>تعديل</small></button>'
+      : '<button class="btn done-btn wide" type="button" data-act="done" data-n="' + n + '">✓ تم الإنجاز</button>';
+    return h + '</div>';
   }
   function renderFull(mode, n) {
     var w = ward(n), list;
@@ -274,21 +303,115 @@
     var h = '<div class="full-list">', lastCh = 0;
     list.forEach(function (it) {
       if (it.ch !== lastCh && mode !== 'ward') { var c = chapter(it.ch); h += '<p class="ch-title">' + esc(c.title) + '<br>' + esc(c.heading || c.name) + '</p>'; lastCh = it.ch; }
-      h += '<section class="card flat"><div class="item-meta"><span>' + itemLabel(it) + '</span><span>' + pagesTxt([it.page]) + '</span></div>' + itemBody(it, 'full', null) + '</section>';
+      h += '<section class="card flat"><div class="item-meta"><span class="chip-k">' + itemLabel(it) + '</span><span>' + pagesTxt([it.page]) + '</span></div>' + itemBody(it, 'full', null) + '</section>';
     });
     if (mode === 'ward') list.forEach(function (it) { markVisited(n, it.id); });
     return h + '</div>';
+  }
+  /* صفحة الكتاب: صفحات الحزمة كلها، تبدأ عند صفحة الورد، وتُسحب يمينًا ويسارًا */
+  var PACK = [16, 40];
+  function pageSrc(p) { return 'pages/p' + ('00' + p).slice(-3) + '.png'; }
+  function renderPages(w) {
+    var h = '<div class="pages" id="pages" tabindex="0" aria-label="صفحات الكتاب">';
+    for (var p = PACK[0]; p <= PACK[1]; p++) {
+      var mine = w.pages.indexOf(p) >= 0;
+      h += '<figure class="pg' + (mine ? ' mine' : '') + '" data-p="' + p + '"><button type="button" data-act="zoom" data-p="' + p + '" aria-label="تكبير الصفحة ' + ar(p) + '"><img src="' + pageSrc(p) + '" alt="صفحة ' + ar(p) + ' من الكتاب" loading="' + (Math.abs(p - w.pages[0]) < 2 ? 'eager' : 'lazy') + '" width="1713" height="2540"></button>' +
+        '<figcaption>' + (mine ? '<b>من ورد اليوم</b>، ' : '') + 'صفحة ' + ar(p) + '</figcaption></figure>';
+    }
+    h += '</div><div class="pg-tools"><button class="btn ghost" type="button" data-act="pg" data-d="-1">→ السابقة</button><span class="num" id="pgNo"></span><button class="btn ghost" type="button" data-act="pg" data-d="1">التالية ←</button></div>';
+    h += '<p class="muted small center">المس الصفحة لتكبيرها.</p><a class="btn soft wide" href="pack1.pdf" download="حزمة-حفظ-المنهاج-١.pdf">⬇ تنزيل ملف الحزمة كاملًا (PDF)</a>';
+    return h;
+  }
+  function initPages(w) {
+    var box = $('#pages'); if (!box) return;
+    var first = box.querySelector('[data-p="' + (S.pg || w.pages[0]) + '"]');
+    if (first) box.scrollLeft = first.offsetLeft - box.offsetLeft - (box.clientWidth - first.clientWidth) / 2;
+    var upd = function () {
+      var mid = box.getBoundingClientRect().left + box.clientWidth / 2, best = null, bd = 1e9;
+      box.querySelectorAll('.pg').forEach(function (f) { var r = f.getBoundingClientRect(), d = Math.abs(r.left + r.width / 2 - mid); if (d < bd) { bd = d; best = f; } });
+      if (best) { S.pg = +best.dataset.p; $('#pgNo').textContent = 'صفحة ' + ar(S.pg) + ' من ' + ar(PACK[1]); }
+    };
+    box.addEventListener('scroll', function () { clearTimeout(box._t); box._t = setTimeout(upd, 80); }, { passive: true });
+    upd();
+  }
+  function zoomPage(p) {
+    var z = document.createElement('div'); z.className = 'zoom'; z.setAttribute('role', 'dialog'); z.setAttribute('aria-label', 'صفحة ' + ar(p));
+    z.innerHTML = '<div class="zoom-bar"><button type="button" data-z="out" aria-label="تصغير">−</button><span>صفحة ' + ar(p) + '</span><button type="button" data-z="in" aria-label="تكبير">＋</button><button type="button" data-z="x" aria-label="إغلاق">✕</button></div><div class="zoom-box"><img src="' + pageSrc(p) + '" alt="صفحة ' + ar(p) + '"></div>';
+    document.body.appendChild(z);
+    var sc = 1, img = z.querySelector('img'), box = z.querySelector('.zoom-box');
+    function set(v) { sc = Math.max(1, Math.min(3, v)); img.style.width = (sc * 100) + '%'; }
+    z.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-z]'); if (!b) return;
+      if (b.dataset.z === 'x') return z.remove();
+      set(sc + (b.dataset.z === 'in' ? 0.5 : -0.5));
+    });
+    img.addEventListener('dblclick', function () { set(sc > 1 ? 1 : 2); });
+    document.addEventListener('keydown', function esc1(e) { if (e.key === 'Escape') { z.remove(); document.removeEventListener('keydown', esc1); } });
+    box.focus && box.focus();
+  }
+  /* السحب للتنقّل بين العناصر: يمينًا للتالي (كتقليب كتاب عربي) ويسارًا للسابق */
+  function bindSwipe() {
+    var el = $('#itemCard'); if (!el) return;
+    var x0 = null, y0 = 0, dx = 0, axis = null, t0 = 0, pid = null;
+    el.addEventListener('pointerdown', function (e) { if (e.button || e.target.closest('button,input,a')) return; x0 = e.clientX; y0 = e.clientY; dx = 0; axis = null; t0 = performance.now(); pid = e.pointerId; });
+    el.addEventListener('pointermove', function (e) {
+      if (x0 === null || e.pointerId !== pid) return;
+      var x = e.clientX - x0, y = e.clientY - y0;
+      if (!axis) { if (Math.hypot(x, y) < 10) return; axis = Math.abs(x) > Math.abs(y) ? 'x' : 'y'; if (axis === 'x') { try { el.setPointerCapture(pid); } catch (er) {} el.style.transition = 'none'; } }
+      if (axis !== 'x') return;
+      dx = x; el.style.transform = 'translateX(' + dx * 0.9 + 'px)'; el.style.opacity = String(1 - Math.min(0.35, Math.abs(dx) / 600));
+    });
+    function end() {
+      if (x0 === null) return; x0 = null;
+      if (axis !== 'x') return;
+      el.dataset.dragged = '1'; setTimeout(function () { delete el.dataset.dragged; }, 60);
+      var far = Math.abs(dx) > el.offsetWidth * 0.28 || (Math.abs(dx) > 40 && Math.abs(dx) / (performance.now() - t0) > 0.5);
+      var items = wardItems(S.w), can = dx > 0 ? S.idx + S.span < items.length : S.idx > 0;
+      if (far && can) return step(dx > 0 ? 1 : -1);
+      el.style.transition = 'transform .22s ease, opacity .22s ease'; el.style.transform = ''; el.style.opacity = '';
+      if (far && !can) toast(dx > 0 ? 'هذا آخر الورد' : 'هذا أول الورد');
+    }
+    el.addEventListener('pointerup', end); el.addEventListener('pointercancel', end);
+    el.addEventListener('click', function (e) { if (el.dataset.dragged) { e.stopPropagation(); e.preventDefault(); } }, true);
+  }
+  function step(d) {
+    var items = wardItems(S.w);
+    S.idx = Math.max(0, Math.min(items.length - 1, S.idx + d * (d > 0 ? S.span : 1)));
+    S.span = Math.min(S.span, items.length - S.idx); S.dir = d > 0 ? 'next' : 'prev';
+    render(); S.dir = null;
+    var card = $('#itemCard'); if (card && card.getBoundingClientRect().top < 0) card.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  }
+
+  /* ---------- «تم الإنجاز»: خطوتان قصيرتان ---------- */
+  function doneFlow(n) {
+    var w = ward(n), d = done(n);
+    if (d) return rateSheet(n, true);
+    sheet('<div class="ask"><span class="ask-ico" aria-hidden="true">📖</span><h2>هل سمّعت الورد ' + ar(n) + '؟</h2><p class="muted">' + pagesTxt(w.pages) + '، ' + esc(chapter(w.ch).name) + '</p></div>' +
+      '<div class="stack"><button class="btn done-btn wide" type="button" data-act="done-yes" data-n="' + n + '">نعم، سمّعته</button><button class="btn ghost wide" type="button" data-act="close">ليس بعد</button></div>');
+  }
+  function rateSheet(n, edit) {
+    sheet('<div class="ask"><h2>' + (edit ? 'عدّل تقييم تسميعك' : 'كيف كان تسميعك؟') + '</h2><p class="muted">قيّم نفسك بصدق، فالتقييم يرتّب مراجعتك القادمة.</p></div><div class="rates">' +
+      [['excellent', 'ممتاز', 'بلا خطأ'], ['good', 'جيد', 'أخطاء يسيرة'], ['weak', 'يحتاج مراجعة', 'تعثّرت كثيرًا']].map(function (r) {
+        return '<button class="rate r-' + r[0] + '" type="button" data-act="rate" data-n="' + n + '" data-r="' + r[0] + '"><b>' + r[1] + '</b><span>' + r[2] + '</span></button>';
+      }).join('') + '</div><button class="btn ghost" type="button" data-act="close">إلغاء</button>');
+  }
+  function doneSuccess(n, wasDone) {
+    var d = done(n);
+    if (wasDone) { closeSheet(); toast('عُدّل التقييم'); return; }
+    sheet('<div class="ask win"><div class="fc-ring" aria-hidden="true">✓</div><h2>تقبّل الله منك</h2><p class="pts-big">' + ar(d.points) + ' <small>نقاط</small></p><p class="muted">أُضيفت إلى رصيدك، ومجموعك الآن ' + ar(totalPoints()) + ' نقطة.</p></div>' +
+      '<div class="stack"><a class="btn wide" href="#review" data-act="close">ابدأ مراجعة اليوم</a><button class="btn ghost wide" type="button" data-act="close">حسنًا</button></div>');
+    try { navigator.vibrate && navigator.vibrate(30); } catch (e) {}
   }
 
   /* مؤقّت التركيز */
   var focusTimer;
   function clockTxt() { if (!S.focus) return ''; var s = Math.max(0, Math.round((S.focus.end - Date.now()) / 1000)); return ar(String(Math.floor(s / 60)).padStart(2, '0')) + ':' + ar(String(s % 60).padStart(2, '0')); }
   function startFocus(min) {
-    S.focus = { end: Date.now() + min * 60000 }; S.mode = 'item'; document.body.classList.add('focus'); closeSheet(); render();
+    S.focus = { end: Date.now() + min * 60000 }; S.mode = 'item'; S.sview = 'text'; document.body.classList.add('focus'); closeSheet(); render();
     clearInterval(focusTimer);
     focusTimer = setInterval(function () {
       var el = $('#clock'); if (el) el.textContent = clockTxt();
-      if (Date.now() >= S.focus.end) { stopFocus(); try { navigator.vibrate && navigator.vibrate([200, 100, 200]); } catch (e) {} sheet('<h2>انتهى وقت التركيز</h2><p>أحسنت. إن أتممت حفظ الورد فاضغط «سمّعت».</p><button class="btn wide" type="button" data-act="close">حسنًا</button>'); }
+      if (Date.now() >= S.focus.end) { stopFocus(); try { navigator.vibrate && navigator.vibrate([200, 100, 200]); } catch (e) {} sheet('<h2>انتهى وقت التركيز</h2><p>أحسنت. إن أتممت حفظ الورد فاضغط «تم الإنجاز».</p><button class="btn wide" type="button" data-act="close">حسنًا</button>'); }
     }, 1000);
   }
   function stopFocus() { clearInterval(focusTimer); S.focus = null; document.body.classList.remove('focus'); render(); }
@@ -299,16 +422,16 @@
     if (S.quiz) return renderQuiz();
     var mem = memorizedItems(), fri = Rules.isFriday(today()), dt = deckToday();
     var h = '<div class="hello"><h1>المراجعة</h1><p class="muted">بطاقات تذكّر: ترى أول النص، فتسمّعه في نفسك، ثم تقلب البطاقة لترى الجواب وتقيّم نفسك.</p></div>';
-    h += '<section class="card fc-hero"><div class="fc-hero-txt"><span class="small">' + (fri ? 'الجمعة: كل ما حفظت' : 'مراجعة اليوم') + '</span><b>' + (dt.length ? ar(dt.length) + ' ' + cardsWord(dt.length) : (mem.length ? 'لا بطاقات مستحقة' : 'لم تحفظ بعد')) + '</b>' +
-      '<span class="small">' + (dt.length ? 'يتقدّم فيها ما يُرجَّح نسيانه.' : (mem.length ? 'أحسنت، عُد غدًا. ويمكنك التدرّب بالبطاقات أدناه.' : 'تبدأ مراجعتك بعد أن تُنجز أول ورد، وتستطيع التدرّب الآن ببطاقات الورد.')) + '</span></div>' +
-      '<div class="fc-pile" aria-hidden="true"><i></i><i></i><i></i></div>' +
+    h += '<section class="card fc-hero"><div class="fc-hero-txt"><span class="small">' + (fri ? 'مراجعة الجمعة الشاملة' : 'مراجعة اليوم') + '</span><b>' + (dt.length ? ar(dt.length) + ' ' + cardsWord(dt.length) : (mem.length ? 'لا بطاقات مستحقة' : 'لم تحفظ بعد')) + '</b>' +
+      '<span class="small">' + (dt.length ? (fri ? 'كل ما حفظت، بمؤقّت ومؤشر تقدّم.' : 'يبدأ الأضعف أولًا، ثم ما حان موعده.') : (mem.length ? 'أحسنت، عُد غدًا. ويمكنك التدرّب بالبطاقات أدناه.' : 'تبدأ مراجعتك بعد أن تُنجز أول ورد، وتستطيع التدرّب الآن ببطاقات الورد.')) + '</span></div>' +
+      '<div class="fc-pile" aria-hidden="true"><i></i><i></i><i></i></div>' + (streak() ? '<span class="streak-chip">🔥 ' + ar(streak()) + ' ' + daysWord(streak()) + ' متتالية</span>' : '') +
       (dt.length ? '<button class="btn wide fc-go" type="button" data-act="fc-start" data-deck="today">ابدأ البطاقات</button>' : '') + '</section>';
     var w = currentWard(), wc = w ? deckWard(w.n).length : 0;
     h += '<div class="decks">' +
       deckTile('ward', '📖', w ? 'بطاقات الورد ' + ar(w.n) : 'بطاقات الورد', w ? ar(wc) + ' ' + cardsWord(wc) + '، للتدرّب أثناء الحفظ' : 'لا ورد مفتوح بعد', !w) +
       deckTile('pick', '🗂️', 'اختر وردًا', 'بطاقات أي ورد فُتح', !D.wards.some(function (x) { return opened(x) && wardItems(x.n).length; })) +
       deckTile('all', '🔀', 'كل محفوظي', mem.length ? 'بطاقات عشوائية من كل ما حفظت' : 'بعد أول ورد تنجزه', !mem.length) +
-      deckTile('quiz', '✍️', 'اختبار سريع', 'من الراوي؟ وما المصدر؟ وأكمل', !mem.length) + '</div>';
+      deckTile('quiz', '✍️', 'اختبار سريع', 'الراوي والمصدر والكلمة الناقصة', !mem.length) + '</div>';
     if (mem.length) h += '<section class="card flat"><div class="row"><span class="muted small">محفوظك حتى الآن</span><b class="num">' + ar(mem.length) + ' ' + (mem.length > 10 ? 'عنصرًا' : 'عناصر') + '</b></div></section>';
     view.innerHTML = h;
   }
@@ -324,21 +447,18 @@
      وجه البطاقة: أول النص (أو المتن لسؤال الراوي والمصدر)، وظهرها: النص كاملًا.
      يقيّم الطالب نفسه بعد القلب: لم أتذكر / بصعوبة / تذكرت، فيتحدد موعد عودة البطاقة. */
   function cueWords(text, n) { var w = text.split(' '); return w.length <= n ? text : w.slice(0, n).join(' ') + ' …'; }
-  function cardsFor(it) {
-    var c = [{ key: it.id, it: it, kind: 'text' }];
-    if (it.type === 'hadith') c.push({ key: it.id + ':rs', it: it, kind: 'rs' });
-    return c;
-  }
+  function cardsFor(it) { return [{ key: it.id, it: it, kind: 'text' }]; }   // الحديث كتلة واحدة: راويه ومتنه ومصدره
   function flat(items) { var out = []; items.forEach(function (it) { out = out.concat(cardsFor(it)); }); out.forEach(function (c, i) { c.ord = i; }); return out; }
   // سجلّ البطاقة، وبطاقة «الراوي والمصدر» ترث سجلّ حديثها حتى تُقيَّم أول مرة
   function rec(key) { return srs[key] || (/:rs$/.test(key) ? srs[key.slice(0, -3)] : null); }
   function srsOrder(a, b) {
+    // الأضعف أولًا: الأدنى درجة، ثم الأكثر تعثّرًا، ثم الأقدم موعدًا
     var x = rec(a.key) || { due: '', lvl: 0 }, y = rec(b.key) || { due: '', lvl: 0 };
-    return (x.due < y.due ? -1 : x.due > y.due ? 1 : 0) || x.lvl - y.lvl || a.ord - b.ord;
+    return x.lvl - y.lvl || (y.lap || 0) - (x.lap || 0) || (x.due < y.due ? -1 : x.due > y.due ? 1 : 0) || a.ord - b.ord;
   }
   function deckToday() {
     var cards = flat(memorizedItems());
-    if (Rules.isFriday(today())) return cards;
+    if (Rules.isFriday(today())) return cards.sort(srsOrder);
     return cards.filter(function (c) { var r = rec(c.key); return !r || r.due <= today(); }).sort(srsOrder).slice(0, 12);
   }
   function deckWard(n) { return flat(wardItems(n)); }
@@ -346,12 +466,10 @@
     var it = c.it, lead = it.lead ? '<span class="lead">' + esc(it.lead) + '</span> ' : '';
     if (it.type === 'ayah') return '<span class="fc-k">آية</span><p class="fc-intro">' + esc(it.intro) + '</p><p class="quran fc-cue">﴿' + fmt(cueWords(it.text, 3), 'full') + '﴾</p><p class="fc-ask">أكمل الآية</p>';
     if (it.type === 'note') return '<span class="fc-k">فائدة</span><div class="tx fc-cue">' + fmt(cueWords(it.text, 5), 'full') + '</div><p class="fc-ask">أكمل الفائدة</p>';
-    if (c.kind === 'rs') return '<span class="fc-k">الحديث ' + ar(it.no) + '</span><div class="tx matn fc-cue fc-small">' + lead + fmt(cueWords(it.matn, 16), 'full') + '</div><p class="fc-ask">من راويه؟ ومن أخرجه؟</p>';
-    return '<span class="fc-k">الحديث ' + ar(it.no) + '</span><div class="tx fc-nar">' + fmt(it.narrator, 'full') + '</div><div class="tx matn fc-cue">' + lead + fmt(cueWords(it.matn, 3), 'full') + '</div><p class="fc-ask">سمّع الحديث ومصدره</p>';
+    return '<span class="fc-k">الحديث ' + ar(it.no) + '</span><p class="fc-intro">' + esc(chapter(it.ch).name) + '</p><div class="tx matn fc-cue">' + lead + fmt(cueWords(it.matn, 3), 'full') + '</div><p class="fc-ask">سمّع الحديث كاملًا: راويه ومتنه ومصدره</p>';
   }
   function backHTML(c) {
     var it = c.it;
-    if (c.kind === 'rs') return '<span class="fc-k">الحديث ' + ar(it.no) + '، الجواب</span>' + lineHTML('الراوي', fmt(it.narrator, 'full'), '', 'full', 'r') + lineHTML('المصدر', fmt(it.source, 'full'), '', 'full', 's');
     return '<span class="fc-k">' + itemLabel(it) + '، ' + pagesTxt([it.page]) + '</span>' + itemBody(it, 'full', null);
   }
   function dueDays(key, g) {
@@ -368,7 +486,7 @@
   function gradeCard(c, g) {
     if (!done(c.it.ward)) return;                              // تدريب قبل إنجاز الورد: لا يغيّر مواعيد المراجعة
     var r = Object.assign({ lvl: 0 }, rec(c.key)), d = nextDays(c.key, g);
-    if (g === 0) r.lvl = 0; else if (g === 2) r.lvl = Math.min(r.lvl + 1, INT.length - 1);
+    if (g === 0) { r.lvl = 0; r.lap = (r.lap || 0) + 1; } else if (g === 2) r.lvl = Math.min(r.lvl + 1, INT.length - 1);
     r.due = dueBy(addDays(today(), d)); r.last = today();
     srs[c.key] = r; saveSrs();
   }
@@ -378,10 +496,13 @@
     else if (deck === 'ward') { var w = n ? ward(n) : currentWard(); list = deckWard(w.n); title = 'بطاقات الورد ' + ar(w.n); }
     else { list = shuffle(flat(memorizedItems())).slice(0, 20); title = 'كل محفوظي'; }
     if (!list.length) return toast('لا بطاقات هنا بعد');
-    S.fc = { list: list.map(function (c) { return { key: c.key, it: c.it, kind: c.kind, rep: 0 }; }), i: 0, flipped: false, title: title, tally: [0, 0, 0], weak: [] };
+    S.fc = { list: list.map(function (c) { return { key: c.key, it: c.it, kind: c.kind, rep: 0 }; }), i: 0, flipped: false, title: title, tally: [0, 0, 0], weak: [], t0: Date.now(), timer: deck === 'today' && Rules.isFriday(today()) };
+    clearInterval(fcClock); if (S.fc.timer) fcClock = setInterval(function () { var el = $('#fcTime'); if (el && S.fc) el.textContent = elapsed(S.fc.t0); else if (!S.fc) clearInterval(fcClock); }, 1000);
     if (S.tab !== 'review') location.hash = '#review'; else render();
     window.scrollTo(0, 0);
   }
+  var fcClock;
+  function elapsed(t0) { var s = Math.round((Date.now() - t0) / 1000); return ar(String(Math.floor(s / 60)).padStart(2, '0')) + ':' + ar(String(s % 60).padStart(2, '0')); }
   function renderCards() {
     var F = S.fc, c = F.list[F.i];
     if (!c) return renderCardsDone();
@@ -389,11 +510,11 @@
     var h = '<div class="fc-top"><button class="icon-btn" type="button" data-act="fc-end" aria-label="إنهاء البطاقات">✕</button>' +
       '<div class="fc-prog" role="progressbar" aria-valuemin="0" aria-valuemax="' + F.list.length + '" aria-valuenow="' + F.i + '"><i style="width:' + Math.round(F.i / F.list.length * 100) + '%"></i></div>' +
       '<span class="num small">' + ar(F.i + 1) + ' / ' + ar(F.list.length) + '</span></div>';
-    h += '<p class="fc-title">' + esc(F.title) + (practice ? '، تدريب' : '') + '</p>';
+    h += '<p class="fc-title">' + esc(F.title) + (practice ? '، تدريب' : '') + (F.timer ? '<span class="fc-time">⏱ <b id="fcTime" class="num">' + elapsed(F.t0) + '</b></span>' : '') + '</p>';
     h += '<div class="fc-stage"><div class="fc fc-enter' + (F.flipped ? ' flipped' : '') + '" id="fc" role="button" tabindex="0" aria-label="بطاقة، المس لقلبها">' +
       '<div class="fc-in"><div class="fc-face fc-front"' + (F.flipped ? ' inert' : '') + '>' + frontHTML(c) + '<div class="fc-hintbox" hidden></div><p class="fc-hint">المس البطاقة لقلبها</p></div>' +
       '<div class="fc-face fc-back" aria-live="polite"' + (F.flipped ? '' : ' inert') + '>' + backHTML(c) + '</div></div>' +
-      '<span class="fc-tag fc-tag-ok" aria-hidden="true">أتقنته</span><span class="fc-tag fc-tag-no" aria-hidden="true">لم أتذكر</span></div></div>';
+      '<span class="fc-tag fc-tag-ok" aria-hidden="true">عرفتها</span><span class="fc-tag fc-tag-no" aria-hidden="true">لم أعرفها</span></div></div>';
     h += '<div id="fcCtl">' + cardControls(c) + '</div>';
     view.innerHTML = h;
     bindCard();
@@ -403,9 +524,9 @@
       (S.fc.hinted ? '' : '<button class="btn ghost wide fc-hintbtn" type="button" data-act="fc-hint">تلميح: أوائل الكلمات</button>');
     var practice = !done(c.it.ward);
     return '<p class="fc-q">قارن بما سمّعت: كيف كان؟</p><div class="fc-grade">' +
-      [[2, 'أتقنته'], [1, 'بأخطاء يسيرة'], [0, 'لم أتذكر']].filter(function (g) { return !(g[0] === 2 && S.fc.hinted); }).map(function (g) {
+      [[2, 'عرفتها'], [1, 'بأخطاء يسيرة'], [0, 'لم أعرفها']].filter(function (g) { return !(g[0] === 2 && S.fc.hinted); }).map(function (g) {
         return '<button class="g' + g[0] + '" type="button" data-act="fc-grade" data-g="' + g[0] + '">' + g[1] + (practice ? '' : '<small>' + daysTxt(dueDays(c.key, g[0])) + '</small>') + '</button>';
-      }).join('') + '</div><p class="fc-hint2">' + (S.fc.hinted ? 'استعنت بالتلميح، فأعلى تقييم «بأخطاء يسيرة».' : 'أو اسحب البطاقة: يمينًا «أتقنته»، ويسارًا «لم أتذكر»') + '</p>';
+      }).join('') + '</div><p class="fc-hint2">' + (S.fc.hinted ? 'استعنت بالتلميح، فأعلى تقييم «بأخطاء يسيرة».' : 'أو اسحب البطاقة: يمينًا «عرفتها»، ويسارًا «لم أعرفها»') + '</p>';
   }
   function flipCard(to) {
     var el = $('#fc'); if (!el || !S.fc) return;
@@ -418,8 +539,8 @@
   }
   function hintText(c) {
     var it = c.it;
-    if (c.kind === 'rs') return 'الراوي: ' + fmt(it.narrator, 'first') + '<br>المصدر: ' + fmt(it.source, 'first');
-    return fmt(it.type === 'hadith' ? it.matn : it.text, 'first');
+    if (it.type === 'hadith') return fmt(it.narrator, 'first') + '<br>' + fmt(it.matn, 'first') + '<br>' + fmt(it.source, 'first');
+    return fmt(it.text, 'first');
   }
   function showHint() {
     var F = S.fc, c = F.list[F.i], box = $('.fc-hintbox'); if (!box) return;
@@ -429,7 +550,7 @@
   }
   function gradeAndNext(g, dir) {
     var F = S.fc, c = F.list[F.i], el = $('#fc');
-    gradeCard(c, g); F.tally[g]++;
+    gradeCard(c, g); F.tally[g]++; markDay();
     if (g < 2 && F.weak.indexOf(c) < 0) F.weak.push(c);
     if (g === 0 && c.rep < 2) { c.rep++; F.list.push(c); }      // ما لم يُتذكر يعود في آخر الجلسة
     var go = function () { F.i++; F.flipped = false; F.hinted = false; renderCards(); window.scrollTo(0, 0); };
@@ -470,9 +591,12 @@
   }
   function renderCardsDone() {
     var F = S.fc, t = F.tally, total = t[0] + t[1] + t[2];
+    clearInterval(fcClock);
+    var st = streak();
     var h = '<section class="card fc-done"><div class="fc-ring" aria-hidden="true">✓</div><h2>أتممت ' + esc(F.title) + '</h2>' +
-      '<div class="fc-sum"><div class="s2"><b>' + ar(t[2]) + '</b><span>أتقنته</span></div><div class="s1"><b>' + ar(t[1]) + '</b><span>بأخطاء يسيرة</span></div><div class="s0"><b>' + ar(t[0]) + '</b><span>لم أتذكر</span></div></div>' +
-      '<p class="muted small">' + (t[0] + t[1] ? 'ما تعثّرت فيه يعود إليك قريبًا، فالتكرار المتباعد يثبّته.' : 'ما شاء الله، أتقنت كل البطاقات.') + '</p>' +
+      (F.timer ? '<p class="muted">في ' + elapsed(F.t0) + ' دقيقة</p>' : '') + (st > 1 ? '<p class="streak">🔥 ' + ar(st) + ' ' + daysWord(st) + ' متتالية</p>' : '') +
+      '<div class="fc-sum"><div class="s2"><b>' + ar(t[2]) + '</b><span>عرفتها</span></div><div class="s1"><b>' + ar(t[1]) + '</b><span>بأخطاء يسيرة</span></div><div class="s0"><b>' + ar(t[0]) + '</b><span>لم أعرفها</span></div></div>' +
+      '<p class="muted small">' + (t[0] + t[1] ? 'ما تعثّرت فيه يعود إليك قريبًا، فالتكرار المتباعد يثبّته.' : 'ما شاء الله، عرفت البطاقات كلها.') + '</p>' +
       (F.weak.length ? '<button class="btn soft wide" type="button" data-act="fc-weak">أعد ما تعثّرت فيه (' + ar(F.weak.length) + ')</button>' : '') +
       '<button class="btn wide" type="button" data-act="fc-end">العودة إلى المراجعة</button></section>';
     view.innerHTML = h;
@@ -481,24 +605,43 @@
   function shuffle(a) { a = a.slice(); for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
   function makeQuestion() {
     var mem = shuffle(memorizedItems()), it = mem[0], had = D.items.filter(function (i) { return i.type === 'hadith'; });
-    var kinds = it.type === 'hadith' ? ['narrator', 'source', 'complete'] : ['complete'];
+    var kinds = it.type === 'hadith' ? ['narrator', 'source', 'cloze', 'cloze', 'complete'] : ['cloze', 'cloze', 'complete'];
     var k = kinds[Math.floor(Math.random() * kinds.length)];
     function mcq(field) {
       var right = it[field], pool = shuffle(had.map(function (h) { return h[field]; }).filter(function (x, i, a) { return x !== right && a.indexOf(x) === i; })).slice(0, 3);
       return shuffle([right].concat(pool));
     }
+    if (k === 'cloze') { var cz = makeCloze(it); if (cz) return cz; k = 'complete'; }
     if (k === 'narrator') return { it: it, k: k, q: 'من الراوي؟', show: it.lead + ' ' + it.matn, opts: mcq('narrator'), right: it.narrator };
     if (k === 'source') return { it: it, k: k, q: 'ما المصدر؟', show: it.narrator + ' ' + it.matn, opts: mcq('source'), right: it.source };
     var text = it.type === 'ayah' ? it.text : it.type === 'note' ? it.text : it.matn, words = text.split(' '), cut = Math.max(3, Math.min(8, Math.floor(words.length / 3)));
     return { it: it, k: k, q: it.type === 'ayah' ? 'أكمل الآية' : 'أكمل', show: words.slice(0, cut).join(' ') + ' …', rest: text, intro: it.type === 'ayah' ? it.intro : it.type === 'hadith' ? it.narrator + ' ' + (it.lead || '') : '' };
   }
+  /* أكمل الكلمة الناقصة: كلمة من النص تُخفى، وأربعة خيارات */
+  function bare(w) { return w.replace(/[^ء-يٱ-ۓ]/g, ''); }
+  function makeCloze(it) {
+    var text = it.type === 'hadith' ? it.matn : it.text, words = text.split(' ');
+    var cand = words.map(function (w, i) { return i; }).filter(function (i) { return i > 0 && bare(words[i]).length >= 3 && !/[﴿﴾]/.test(words[i]); });
+    if (!cand.length) return null;
+    var i = cand[Math.floor(Math.random() * cand.length)], word = words[i].replace(/^[«(\[]+|[»)\]،.:؛؟!]+$/g, '');
+    var pool = [];
+    D.items.forEach(function (x) { if (x.type !== it.type) return; (x.type === 'hadith' ? x.matn : x.text).split(' ').forEach(function (w) {
+      w = w.replace(/^[«(\[]+|[»)\]،.:؛؟!]+$/g, ''); if (bare(w).length >= 3 && bare(w) !== bare(word) && !/[﴿﴾]/.test(w) && pool.indexOf(w) < 0) pool.push(w); }); });
+    pool.sort(function (a, b) { return Math.abs(bare(a).length - bare(word).length) - Math.abs(bare(b).length - bare(word).length); });
+    var opts = shuffle([word].concat(shuffle(pool.slice(0, 12)).slice(0, 3)));
+    var a = Math.max(0, i - 7), b = Math.min(words.length, i + 6);
+    var show = (a ? '… ' : '') + words.slice(a, i).join(' ') + ' \u2063 ' + words.slice(i + 1, b).join(' ') + (b < words.length ? ' …' : '');
+    return { it: it, k: 'cloze', q: 'أكمل الكلمة الناقصة', show: show, opts: opts, right: word, quran: it.type === 'ayah', intro: it.type === 'ayah' ? it.intro : it.type === 'hadith' ? 'الحديث ' + ar(it.no) : '' };
+  }
   function renderQuiz() {
     var Q = S.quiz.cur, h = '<div class="row"><h1>اختبار مستمر</h1><span class="muted num">صواب ' + ar(S.quiz.right) + ' من ' + ar(S.quiz.n) + '</span></div>';
     h += '<section class="card item-card"><p class="quiz-q">' + Q.q + '</p>';
     if (Q.opts) {
-      h += '<div class="tx matn">' + fmt(Q.show, 'full') + '</div><div class="opts">' + Q.opts.map(function (o, i) {
+      if (Q.k === 'cloze' && Q.intro) h += '<p class="muted small">' + esc(Q.intro) + '</p>';
+      var blank = Q.answered ? '<span class="blank ok">' + esc(Q.right) + '</span>' : '<span class="blank" aria-label="كلمة ناقصة"></span>';
+      h += (Q.quran ? '<p class="quran">' + fmt(Q.show, 'full').replace('\u2063', blank) + '</p>' : '<div class="tx matn">' + fmt(Q.show, 'full').replace('\u2063', blank) + '</div>') + '<div class="opts' + (Q.k === 'cloze' ? ' opts-2' : '') + '">' + Q.opts.map(function (o, i) {
         var cls = Q.answered ? (o === Q.right ? 'right' : (i === Q.picked ? 'wrong' : '')) : '';
-        return '<button type="button" class="' + cls + '" data-act="pick" data-i="' + i + '"' + (Q.answered ? ' disabled' : '') + '>' + fmt(o, 'full') + '</button>';
+        return '<button type="button" class="' + cls + (Q.quran ? ' qopt' : '') + '" data-act="pick" data-i="' + i + '"' + (Q.answered ? ' disabled' : '') + '>' + fmt(o, 'full') + '</button>';
       }).join('') + '</div>';
     } else {
       if (Q.intro) h += '<p class="muted small">' + esc(Q.intro) + '</p>';
@@ -512,7 +655,7 @@
     view.innerHTML = h;
   }
   function quizResult(ok) {
-    S.quiz.n++; if (ok) S.quiz.right++;
+    S.quiz.n++; if (ok) S.quiz.right++; markDay();
     if (!ok) srsGrade(S.quiz.cur.it.id, false);     // الخطأ يعيد العنصر إلى المراجعة غدًا
   }
 
@@ -527,7 +670,9 @@
       '<div class="stat"><b>' + ar(comps.length) + ' / ' + ar(D.wards.length) + '</b><span>الأوراد المنجزة</span></div>' +
       '<div class="stat"><b>' + ar(onTime) + '</b><span>في وقتها</span></div>' +
       '<div class="stat"><b>' + ar(memorizedItems().length) + '</b><span>العناصر المحفوظة</span></div>' +
-      '<div class="stat"><b>' + ar(Object.keys(counts).reduce(function (a, k) { return a + counts[k]; }, 0)) + '</b><span>مجموع التكرار</span></div></div>';
+      '<div class="stat"><b>🔥 ' + ar(streak()) + '</b><span>أيام متتالية</span></div>' +
+      '<div class="stat"><b>' + ar(Object.keys(counts).reduce(function (a, k) { return a + counts[k]; }, 0)) + '</b><span>مجموع التكرار</span></div>' +
+      '<div class="stat"><b>' + ar(Object.keys(srs).filter(function (k) { return k[0] !== '@' && srs[k].lvl >= 3; }).length) + '</b><span>عناصر ثبتت (أسبوع فأكثر)</span></div></div>';
     h += '<section class="card"><h2>نقاط الأوراد</h2><ul class="sched">' + D.wards.filter(function (w) { return opened(w); }).map(function (w) {
       var d = done(w.n);
       return '<li><span class="d">' + dateTxt(w.date) + '</span><span class="t">الورد ' + ar(w.n) + '، ' + pagesTxt(w.pages) + (d ? '<small>تقييمك: ' + RATE[d.rating] + '</small>' : '') + '</span>' + statusChip(w) + '</li>';
@@ -550,12 +695,13 @@
   }
   function route() {
     var h = (location.hash || '#home').slice(1), m = h.match(/^session-(\d+)$/);
-    if (m) { if (S.w !== +m[1]) { S.w = +m[1]; S.idx = 0; S.seg = 0; } setTab('session'); }
-    else if (['home', 'session', 'review', 'stats'].indexOf(h) >= 0) { if (h === 'session' && S.tab !== 'session') { S.w = null; S.idx = 0; S.seg = 0; } setTab(h); }
+    if (m) { if (S.w !== +m[1]) { S.w = +m[1]; S.idx = 0; S.span = 1; S.pg = 0; } setTab('session'); }
+    else if (['home', 'session', 'review', 'stats'].indexOf(h) >= 0) { if (h === 'session' && S.tab !== 'session') { S.w = null; S.idx = 0; S.span = 1; S.pg = 0; } setTab(h); }
     else setTab('home');
     if (S.tab !== 'session' && S.focus) stopFocus();
     if (S.tab !== 'review') { S.fc = null; S.quiz = null; }
-    render(); window.scrollTo(0, 0);
+    view.classList.remove('enter'); render(); void view.offsetWidth; view.classList.add('enter'); clearTimeout(route.t); route.t = setTimeout(function () { view.classList.remove('enter'); }, 700);
+    window.scrollTo(0, 0);
   }
   window.addEventListener('hashchange', route);
 
@@ -564,15 +710,34 @@
     var r = e.target.closest('[data-reveal].hide'); if (r) { reveal(r); return; }
     var b = e.target.closest('[data-act]'); if (!b || b.disabled) return;
     var a = b.dataset.act, items = S.w ? wardItems(S.w) : [];
-    if (a === 'close') closeSheet();
+    if (a === 'close') { closeSheet(); if (b.tagName === 'A') return; }
     else if (a === 'level') { S.level = b.dataset.level; render(); }
-    else if (a === 'mode') { S.mode = b.dataset.mode; render(); }
-    else if (a === 'next' || a === 'prev' || a === 'goto') {
-      S.idx = a === 'goto' ? +b.dataset.i : S.idx + (a === 'next' ? 1 : -1); S.seg = 0; render();
-      var card = $('.item-card'); if (card) card.scrollIntoView({ block: 'nearest' });
+    else if (a === 'mode') { S.mode = b.dataset.mode; S.sview = 'text'; closeSheet(); render(); }
+    else if (a === 'next' || a === 'prev') step(a === 'next' ? 1 : -1);
+    else if (a === 'goto') { var gi = +b.dataset.i; S.dir = gi > S.idx ? 'next' : 'prev'; S.idx = gi; S.span = 1; render(); S.dir = null; }
+    else if (a === 'span') { S.span = Math.max(1, Math.min(3, S.span + (+b.dataset.d))); render(); }
+    else if (a === 'sview') { S.sview = b.dataset.v; render(); }
+    else if (a === 'pg') { var bx = $('#pages'), cur = bx && bx.querySelector('[data-p="' + ((S.pg || 16) + (+b.dataset.d)) + '"]'); if (cur) cur.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' }); }
+    else if (a === 'zoom') zoomPage(+b.dataset.p);
+    else if (a === 'count') {
+      items.slice(S.idx, S.idx + S.span).forEach(function (x) { counts[x.id] = (counts[x.id] || 0) + 1; });
+      var id = items[S.idx].id; ls('cnt', counts);
+      if (targets[id] && counts[id] === targets[id]) toast('بلغت هدفك في التكرار');
+      var tb = $('.sbar .tap b'); if (tb) { tb.innerHTML = ar(counts[id]) + (targets[id] ? '<small> / ' + ar(targets[id]) + '</small>' : ''); b.classList.remove('bump'); void b.offsetWidth; b.classList.add('bump'); }
     }
-    else if (a === 'seg') { var segs = segments(items[S.idx].matn); S.seg = Math.max(0, Math.min(segs.length - 1, S.seg + (+b.dataset.d))); render(); }
-    else if (a === 'count') { var id = items[S.idx].id; counts[id] = (counts[id] || 0) + 1; ls('cnt', counts); if (targets[id] && counts[id] === targets[id]) toast('بلغت هدفك في هذا العنصر'); render(); }
+    else if (a === 'tools') {
+      var cw = chapter(ward(S.w).ch), it0 = items[S.idx];
+      sheet('<h2>أدوات الجلسة</h2><p class="lbl">ماذا تعرض؟</p><div class="opt-grid">' + [['item', 'عنصرًا عنصرًا', 'للحفظ والتكرار'], ['ward', 'الورد كاملًا', 'لقراءته متصلًا'], ['chapter', 'الباب كاملًا', 'ما فُتح من الباب'], ['book', 'المتن كاملًا', 'كل ما فُتح']].map(function (m) {
+        return '<button type="button" class="opt" data-act="mode" data-mode="' + m[0] + '" aria-pressed="' + (S.mode === m[0]) + '"><b>' + m[1] + '</b><span>' + m[2] + '</span></button>';
+      }).join('') + '</div><div class="stack">' +
+        (cw.video ? '<button class="btn soft wide" type="button" data-act="video">▶ مقطع شرح الباب</button>' : '') +
+        '<button class="btn soft wide" type="button" data-act="focus">⏱ جلسة تركيز</button>' +
+        '<button class="btn soft wide" type="button" data-act="fc-start" data-deck="ward" data-n="' + S.w + '">🃏 بطاقات هذا الورد</button></div>' +
+        (S.mode === 'item' && it0 ? '<label class="tgt-row">هدف التكرار لهذا العنصر <input type="number" min="1" max="200" inputmode="numeric" id="tgt" value="' + (targets[it0.id] || '') + '" placeholder="مثلًا ١٠"></label>' : '') +
+        '<button class="btn ghost" type="button" data-act="close">إغلاق</button>');
+    }
+    else if (a === 'done') doneFlow(+b.dataset.n);
+    else if (a === 'done-yes') rateSheet(+b.dataset.n, false);
     else if (a === 'video') {
       var c = chapter(ward(S.w).ch);
       sheet('<h2>مقطع ' + esc(c.title) + '</h2><div class="video-frame"><iframe src="' + esc(c.video.embed) + '" allow="autoplay; fullscreen" allowfullscreen title="مقطع الباب"></iframe></div><a class="btn ghost" href="' + esc(c.video.view) + '" target="_blank" rel="noopener">افتحه في درايف إن لم يعمل هنا</a><button class="btn wide" type="button" data-act="close">إغلاق</button>');
@@ -582,19 +747,14 @@
     }
     else if (a === 'focus-go') startFocus(+b.dataset.m);
     else if (a === 'focus-stop') stopFocus();
-    else if (a === 'recite') {
-      sheet('<h2>كيف كان تسميعك؟</h2><p class="muted">قيّم نفسك بصدق، فالتقييم يحدد مراجعتك القادمة.</p><div class="stack">' +
-        [['excellent', 'ممتاز'], ['good', 'جيد'], ['weak', 'يحتاج مراجعة']].map(function (r) { return '<button class="btn ' + (r[0] === 'excellent' ? '' : 'soft') + ' wide" type="button" data-act="rate" data-r="' + r[0] + '">' + r[1] + '</button>'; }).join('') +
-        '</div><button class="btn ghost" type="button" data-act="close">إلغاء</button>');
-    }
     else if (a === 'rate') {
-      var n = S.w, wasDone = !!done(n), rating = b.dataset.r; b.disabled = true;
+      var n = +b.dataset.n, wasDone = !!done(n), rating = b.dataset.r;
+      document.querySelectorAll('.rates button').forEach(function (x) { x.disabled = true; }); b.classList.add('busy');
       Api.call('complete', { w: n, rating: rating }).then(function (res) {
-        ME = res; closeSheet(); if (!wasDone) srsInit(n, rating);
+        ME = res; if (!wasDone) { srsInit(n, rating); markDay(); }
         if (S.focus) stopFocus();
-        toast(wasDone ? 'عُدّل التقييم' : 'تم الورد، +' + ar(done(n).points) + ' نقاط');
-        render();
-      }).catch(function (err) { b.disabled = false; toast(err.message); });
+        render(); doneSuccess(n, wasDone);
+      }).catch(function (err) { document.querySelectorAll('.rates button').forEach(function (x) { x.disabled = false; }); b.classList.remove('busy'); toast(err.message); });
     }
     else if (a === 'rank') {
       S.rankTrack = b.dataset.track;
@@ -611,7 +771,7 @@
     else if (a === 'fc-hint') showHint();
     else if (a === 'fc-grade') gradeAndNext(+b.dataset.g);
     else if (a === 'fc-weak') { var wk = S.fc.weak; S.fc = { list: wk.map(function (c) { return { key: c.key, it: c.it, kind: c.kind, rep: 0 }; }), i: 0, flipped: false, title: 'ما تعثّرت فيه', tally: [0, 0, 0], weak: [] }; render(); window.scrollTo(0, 0); }
-    else if (a === 'fc-end') { S.fc = null; render(); }
+    else if (a === 'fc-end') { S.fc = null; clearInterval(fcClock); render(); }
     else if (a === 'quiz-start') { S.quiz = { n: 0, right: 0, cur: makeQuestion() }; render(); }
     else if (a === 'pick') { var Q = S.quiz.cur; Q.picked = +b.dataset.i; Q.answered = true; quizResult(Q.opts[Q.picked] === Q.right); render(); }
     else if (a === 'quiz-show') { S.quiz.cur.answered = true; render(); }
@@ -629,9 +789,9 @@
   });
   document.addEventListener('change', function (e) {
     if (e.target.id === 'tgt' && S.w) {
-      var id = wardItems(S.w)[S.idx].id, v = parseInt(e.target.value, 10);
+      var id = wardItems(S.w)[S.idx].id, v = parseInt(String(e.target.value).replace(/[٠-٩]/g, function (d) { return AR.indexOf(d); }), 10);
       if (v > 0) targets[id] = v; else delete targets[id];
-      ls('tgt', targets); render();
+      ls('tgt', targets); toast(v > 0 ? 'هدفك ' + ar(v) + ' تكرارات' : 'أُلغي الهدف'); render();
     }
   });
 

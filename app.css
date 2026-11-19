@@ -177,3 +177,97 @@ body.focus .top,body.focus .tabs,body.focus .hide-in-focus{display:none!importan
 .q{font-family:var(--font-quran);font-weight:400;color:var(--primary);font-size:.95em}
 .tx.hide .q{color:transparent!important}
 .quran-intro,.tx .lead{font-family:var(--font-text)}
+
+/* ---------- بطاقات التذكّر ----------
+   البطاقة تنقلب ثلاثيًّا: الوجهان في خانة شبكة واحدة فيأخذ الارتفاع أطولَهما،
+   والسحب على .fc والقلب على .fc-in فلا يتعارض التحويلان. */
+.fc-hero{background:linear-gradient(160deg,var(--primary) 0%,var(--primary-deep) 100%);color:#fff;border:0;grid-template-columns:1fr auto;align-items:center;gap:14px 12px;padding:18px}
+:root[data-theme="dark"] .fc-hero{background:linear-gradient(160deg,#6d1940 0%,#3d0f26 100%)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .fc-hero{background:linear-gradient(160deg,#6d1940 0%,#3d0f26 100%)}}
+.fc-hero-txt{display:grid;gap:2px;min-width:0}
+.fc-hero-txt b{font-family:var(--font-head);font-size:1.45rem;line-height:1.4}
+.fc-hero-txt .small{color:#f3d9e4}
+.fc-hero .fc-go{grid-column:1/-1;background:#fff;color:#571435}
+.fc-pile{position:relative;width:62px;height:76px}
+.fc-pile i{position:absolute;inset:0;border-radius:12px;background:rgba(255,255,255,.95);box-shadow:0 4px 10px rgba(0,0,0,.18)}
+.fc-pile i:nth-child(1){transform:rotate(-12deg) translateX(-6px);opacity:.45}
+.fc-pile i:nth-child(2){transform:rotate(-5deg) translateX(-2px);opacity:.7}
+.fc-pile i:nth-child(3){transform:rotate(4deg);background:linear-gradient(#fff,#fff) padding-box;border:2px solid #fa9020}
+.decks{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.deck{display:grid;gap:2px;justify-items:start;text-align:start;background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:14px;box-shadow:var(--shadow);min-width:0;line-height:1.5}
+.deck i{font-style:normal;font-size:1.35rem;line-height:1.2;margin-bottom:4px}
+.deck b{font-size:.98rem;color:var(--primary-deep)}
+.deck span{font-size:.78rem;color:var(--ink-2)}
+.deck:disabled{opacity:.5;cursor:not-allowed}
+.deck:not(:disabled):active{transform:scale(.98)}
+.card.flat{box-shadow:none;background:var(--surface-2);border:0;padding:12px 14px}
+.card.flat .row{display:flex;justify-content:space-between;align-items:center;gap:8px}
+
+.fc-top{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:12px}
+.fc-top .icon-btn{width:38px;height:38px;padding:0;display:grid;place-items:center;font-size:1rem}
+.fc-prog{height:8px;background:var(--surface-2);border-radius:999px;overflow:hidden}
+.fc-prog i{display:block;height:100%;background:var(--accent);border-radius:999px;transition:width .35s ease}
+.fc-title{text-align:center;font-size:.84rem;font-weight:700;color:var(--ink-2);margin-top:-6px}
+.fc-stage{padding-block:2px 4px}
+.fc{position:relative;perspective:1400px;touch-action:pan-y;user-select:none;-webkit-user-select:none;cursor:pointer;outline:none;border-radius:24px}
+.fc:focus-visible{outline:3px solid var(--accent);outline-offset:4px}
+.fc-in{display:grid;transform-style:preserve-3d;-webkit-transform-style:preserve-3d;transition:transform .55s cubic-bezier(.2,.75,.25,1)}
+.fc.flipped .fc-in{transform:rotateY(180deg)}
+.fc-face{grid-area:1/1;-webkit-backface-visibility:hidden;backface-visibility:hidden;background:var(--surface);border:1px solid var(--line);border-radius:24px;box-shadow:0 2px 4px rgba(87,20,53,.06),0 14px 34px rgba(87,20,53,.10);padding:24px 20px 18px;min-height:min(360px,56vh);display:flex;flex-direction:column;gap:10px;min-width:0}
+.fc-front{transform:rotateY(0deg) translateZ(1px);justify-content:center;text-align:center;align-items:center;background:radial-gradient(120% 80% at 50% 0%,var(--primary-soft) 0%,var(--surface) 62%)}
+.fc-back{transform:rotateY(180deg) translateZ(1px);border-top:4px solid var(--accent)}
+.fc-k{align-self:center;background:var(--primary-soft);color:var(--primary-deep);border-radius:999px;padding:2px 14px;font-size:.78rem;font-weight:700}
+.fc-back .fc-k{background:var(--accent-soft);color:var(--accent-ink)}
+.fc-intro{font-family:var(--font-text);color:var(--ink-2);font-size:1.05rem}
+.fc-cue.quran{font-size:1.85rem;line-height:2.2}
+.fc-cue.tx{font-size:1.6rem;line-height:1.9;white-space:normal}
+.fc-cue.fc-small{font-size:1.28rem}
+.fc-nar{font-size:1.05rem;color:var(--ink-2);white-space:normal}
+.fc-ask{margin-top:6px;font-weight:700;color:var(--primary);font-size:1rem}
+.fc-hint{margin-top:auto;padding-top:10px;font-size:.78rem;color:var(--ink-2);display:flex;align-items:center;gap:6px}
+.fc-hint::before{content:"↻";font-size:1rem;color:var(--accent)}
+.fc-hintbox{width:100%;background:var(--surface-2);border-radius:14px;padding:8px 12px;font-size:1.15rem;line-height:1.9;white-space:normal;color:var(--ink-2)}
+.fc-hintbox.quran{font-size:1.35rem;color:var(--primary-deep)}
+.fc-back .line .lb{font-size:.78rem}
+.fc-back .tx{font-size:1.38rem}
+.fc-tag{position:absolute;top:18px;z-index:2;padding:4px 14px;border-radius:10px;font-weight:700;font-size:1.05rem;border:2.5px solid;opacity:0;pointer-events:none;background:var(--surface)}
+.fc-tag-ok{left:16px;color:var(--ok);border-color:var(--ok);transform:rotate(-10deg)}
+.fc-tag-no{right:16px;color:var(--miss);border-color:var(--miss);transform:rotate(10deg)}
+#fcCtl{display:grid;gap:10px}
+.fc-q{text-align:center;font-weight:700;font-size:.95rem}
+.fc-grade{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:8px}
+.fc-grade button{border:0;border-radius:16px;padding:12px 6px;font-weight:700;font-size:.98rem;display:grid;gap:0;line-height:1.5;min-height:62px;align-content:center}
+.fc-grade button small{font-weight:500;font-size:.74rem;opacity:.85}
+.fc-grade .g0{background:var(--miss-soft);color:var(--miss)}
+.fc-grade .g1{background:var(--late-soft);color:var(--late)}
+.fc-grade .g2{background:var(--ok);color:#fff}
+:root[data-theme="dark"] .fc-grade .g2{color:#10231a}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .fc-grade .g2{color:#10231a}}
+.fc-grade button:active{transform:scale(.97)}
+.fc-hint2{text-align:center;font-size:.76rem;color:var(--ink-2)}
+.fc-hintbtn{padding:9px 14px;font-size:.9rem}
+.fc-done{text-align:center;justify-items:center;padding:26px 18px}
+.fc-ring{width:72px;height:72px;border-radius:50%;display:grid;place-items:center;font-size:2rem;font-weight:700;background:var(--ok-soft);color:var(--ok)}
+.fc-sum{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;width:100%}
+.fc-sum div{border-radius:14px;padding:10px 4px;display:grid;line-height:1.4}
+.fc-sum b{font-size:1.5rem;font-variant-numeric:tabular-nums}
+.fc-sum span{font-size:.78rem;font-weight:700}
+.fc-sum .s2{background:var(--ok-soft);color:var(--ok)} .fc-sum .s1{background:var(--late-soft);color:var(--late)} .fc-sum .s0{background:var(--miss-soft);color:var(--miss)}
+@media (prefers-reduced-motion: no-preference){
+  .fc-enter{animation:fcIn .38s cubic-bezier(.2,.75,.25,1) both}
+  .fc-done{animation:fcIn .4s ease both}
+  .fc-ring{animation:fcPop .5s .1s cubic-bezier(.3,1.6,.5,1) both}
+  .deck{transition:transform .12s}
+}
+@keyframes fcIn{from{opacity:0;transform:translateY(16px) scale(.96)}to{opacity:1;transform:none}}
+@keyframes fcPop{from{transform:scale(.4);opacity:0}to{transform:none;opacity:1}}
+/* من يفضّل تقليل الحركة: تلاشٍ بدل الدوران */
+@media (prefers-reduced-motion: reduce){
+  .fc-in,.fc.flipped .fc-in{transform:none;transition:none}
+  .fc-front,.fc-back{transform:none;transition:opacity .2s}
+  .fc-back,.fc.flipped .fc-front{opacity:0;visibility:hidden}
+  .fc.flipped .fc-back{opacity:1;visibility:visible}
+}
+@media (min-width:700px){.decks{grid-template-columns:repeat(4,minmax(0,1fr))}}
+/* أزرار التقييم تبقى في متناول الإبهام ولو طال النص على ظهر البطاقة */
+#fcCtl:has(.fc-grade){position:sticky;bottom:calc(var(--tabs-h) - 6px + env(safe-area-inset-bottom,0px));z-index:6;background:var(--bg);padding:10px 0 18px;box-shadow:0 -14px 14px -6px var(--bg)}

@@ -117,7 +117,12 @@
   }
 
   /* ---------- التكرار المتباعد ---------- */
-  var INT = [1, 3, 7, 14, 30];
+  // سلّم ثابت قصير يناسب مسابقة أسابيع قليلة (البحث: الفاصل الأمثل قرابة خُمس المدة إلى الاختبار)
+  var INT = [1, 2, 4, 7, 7];
+  function dueBy(d) {                                       // كل بطاقة تعود مرة أخيرة قبل الاختبار بيومين
+    var last = addDays(D.test_date, -2);
+    return d > last && today() < last ? last : d;
+  }
   var srs = ls('srs') || {};
   var syncT;
   function saveSrs() { ls('srs', srs); clearTimeout(syncT); syncT = setTimeout(function () { Api.call('srs', { srs: srs }).catch(function () {}); }, 2500); }
@@ -125,14 +130,14 @@
     wardItems(n).forEach(function (it) {
       if (srs[it.id]) return;
       var lvl = rating === 'excellent' ? 1 : 0;
-      srs[it.id] = { lvl: lvl, due: addDays(today(), INT[lvl]), last: today() };
+      srs[it.id] = { lvl: lvl, due: dueBy(addDays(today(), INT[lvl])), last: today() };
     });
     saveSrs();
   }
   function srsGrade(id, ok) {
     var r = srs[id] || { lvl: 0 };
     r.lvl = ok ? Math.min(r.lvl + 1, INT.length - 1) : 0;
-    r.due = addDays(today(), ok ? INT[r.lvl] : 1);
+    r.due = dueBy(addDays(today(), ok ? INT[r.lvl] : 1));
     r.last = today();
     srs[id] = r; saveSrs();
   }
@@ -222,7 +227,8 @@
         return '<button type="button" data-act="mode" data-mode="' + m[0] + '" aria-pressed="' + (S.mode === m[0]) + '">' + m[1] + '</button>';
       }).join('') + '</div></div>';
     h += '<div class="tools hide-in-focus">' + (c.video ? '<button class="btn ghost" type="button" data-act="video">مقطع الباب</button>' : '') +
-      '<button class="btn ghost" type="button" data-act="focus">جلسة تركيز</button></div>';
+      '<button class="btn ghost" type="button" data-act="focus">جلسة تركيز</button>' +
+      '<button class="btn ghost" type="button" data-act="fc-start" data-deck="ward" data-n="' + n + '">بطاقات الورد</button></div>';
     if (S.mode === 'item') h += renderItemMode(n, items);
     else h += renderFull(S.mode, n);
     var d = done(n), seen = visited(n), all = items.every(function (i) { return seen.indexOf(i.id) >= 0; });
@@ -289,25 +295,188 @@
 
   /* ---------- المراجعة والاختبار المستمر ---------- */
   function renderReview() {
-    var mem = memorizedItems(), due = dueItems(), fri = Rules.isFriday(today());
-    var h = '<div class="hello"><h1>المراجعة</h1><p class="muted">' + (fri ? 'الجمعة: مراجعة كاملة لكل ما حفظت.' : 'مراجعة يومية قليلة، يتقدّم فيها ما يُرجَّح نسيانه.') + '</p></div>';
-    if (S.review) return renderReviewCard();
+    if (S.fc) return renderCards();
     if (S.quiz) return renderQuiz();
-    if (!mem.length) { view.innerHTML = h + '<section class="card"><p>تبدأ المراجعة بعد أن تُنجز أول ورد.</p><a class="btn" href="#session">إنجاز ورد اليوم</a></section>'; return; }
-    h += '<section class="card"><h2>مراجعة اليوم</h2><p>' + (due.length ? 'عندك ' + ar(due.length) + ' ' + (due.length > 10 ? 'عنصرًا' : 'عناصر') + ' للمراجعة.' : 'لا شيء مستحق اليوم. أحسنت.') + '</p>' +
-      (due.length ? '<button class="btn wide" type="button" data-act="review-start">ابدأ المراجعة</button>' : '') + '</section>';
-    h += '<section class="card"><h2>اختبار مستمر</h2><p class="muted">بطاقات عشوائية من كل ما حفظت: من الراوي؟ وما المصدر؟ وأكمل. ويتّسع مع كل حفظ جديد.</p><button class="btn soft wide" type="button" data-act="quiz-start">ابدأ الاختبار</button></section>';
-    h += '<section class="card flat"><div class="row"><span class="muted small">محفوظك حتى الآن</span><b class="num">' + ar(mem.length) + ' عنصرًا</b></div></section>';
+    var mem = memorizedItems(), fri = Rules.isFriday(today()), dt = deckToday();
+    var h = '<div class="hello"><h1>المراجعة</h1><p class="muted">بطاقات تذكّر: ترى أول النص، فتسمّعه في نفسك، ثم تقلب البطاقة لترى الجواب وتقيّم نفسك.</p></div>';
+    h += '<section class="card fc-hero"><div class="fc-hero-txt"><span class="small">' + (fri ? 'الجمعة: كل ما حفظت' : 'مراجعة اليوم') + '</span><b>' + (dt.length ? ar(dt.length) + ' ' + cardsWord(dt.length) : (mem.length ? 'لا بطاقات مستحقة' : 'لم تحفظ بعد')) + '</b>' +
+      '<span class="small">' + (dt.length ? 'يتقدّم فيها ما يُرجَّح نسيانه.' : (mem.length ? 'أحسنت، عُد غدًا. ويمكنك التدرّب بالبطاقات أدناه.' : 'تبدأ مراجعتك بعد أن تُنجز أول ورد، وتستطيع التدرّب الآن ببطاقات الورد.')) + '</span></div>' +
+      '<div class="fc-pile" aria-hidden="true"><i></i><i></i><i></i></div>' +
+      (dt.length ? '<button class="btn wide fc-go" type="button" data-act="fc-start" data-deck="today">ابدأ البطاقات</button>' : '') + '</section>';
+    var w = currentWard(), wc = w ? deckWard(w.n).length : 0;
+    h += '<div class="decks">' +
+      deckTile('ward', '📖', w ? 'بطاقات الورد ' + ar(w.n) : 'بطاقات الورد', w ? ar(wc) + ' ' + cardsWord(wc) + '، للتدرّب أثناء الحفظ' : 'لا ورد مفتوح بعد', !w) +
+      deckTile('pick', '🗂️', 'اختر وردًا', 'بطاقات أي ورد فُتح', !D.wards.some(function (x) { return opened(x) && wardItems(x.n).length; })) +
+      deckTile('all', '🔀', 'كل محفوظي', mem.length ? 'بطاقات عشوائية من كل ما حفظت' : 'بعد أول ورد تنجزه', !mem.length) +
+      deckTile('quiz', '✍️', 'اختبار سريع', 'من الراوي؟ وما المصدر؟ وأكمل', !mem.length) + '</div>';
+    if (mem.length) h += '<section class="card flat"><div class="row"><span class="muted small">محفوظك حتى الآن</span><b class="num">' + ar(mem.length) + ' ' + (mem.length > 10 ? 'عنصرًا' : 'عناصر') + '</b></div></section>';
     view.innerHTML = h;
   }
-  function renderReviewCard() {
-    var R = S.review, it = R.list[R.i];
-    var h = '<div class="row"><h1>المراجعة</h1><span class="muted num">' + ar(R.i + 1) + ' من ' + ar(R.list.length) + '</span></div>';
-    h += '<section class="card item-card"><div class="item-meta"><span>' + itemLabel(it) + '</span><span>' + pagesTxt([it.page]) + '</span></div>' + itemBody(it, R.shown ? 'full' : 'hide', null) + '</section>';
-    h += R.shown ? '<p class="muted small" style="text-align:center">هل تذكرته كما هو؟</p><div class="grade"><button class="btn soft" type="button" data-act="grade" data-ok="0">تعثرت</button><button class="btn" type="button" data-act="grade" data-ok="1">تذكرته</button></div>'
-      : '<button class="btn wide" type="button" data-act="show">سمّعه في نفسك، ثم اضغط لإظهاره</button>';
-    h += '<button class="btn ghost" type="button" data-act="review-end">إنهاء المراجعة</button>';
+  function deckTile(deck, icon, title, sub, off) {
+    return '<button class="deck" type="button" data-act="' + (deck === 'quiz' ? 'quiz-start' : 'fc-start') + '" data-deck="' + deck + '"' + (off ? ' disabled' : '') + '><i aria-hidden="true">' + icon + '</i><b>' + title + '</b><span>' + sub + '</span></button>';
+  }
+  function cardsWord(n) { return n === 1 ? 'بطاقة' : n === 2 ? 'بطاقتان' : n <= 10 ? 'بطاقات' : 'بطاقة'; }
+  function currentWard() {
+    return todayWard() || D.wards.filter(function (x) { return opened(x) && wardItems(x.n).length; }).slice(-1)[0] || null;
+  }
+
+  /* ---------- بطاقات التذكّر ----------
+     وجه البطاقة: أول النص (أو المتن لسؤال الراوي والمصدر)، وظهرها: النص كاملًا.
+     يقيّم الطالب نفسه بعد القلب: لم أتذكر / بصعوبة / تذكرت، فيتحدد موعد عودة البطاقة. */
+  function cueWords(text, n) { var w = text.split(' '); return w.length <= n ? text : w.slice(0, n).join(' ') + ' …'; }
+  function cardsFor(it) {
+    var c = [{ key: it.id, it: it, kind: 'text' }];
+    if (it.type === 'hadith') c.push({ key: it.id + ':rs', it: it, kind: 'rs' });
+    return c;
+  }
+  function flat(items) { var out = []; items.forEach(function (it) { out = out.concat(cardsFor(it)); }); out.forEach(function (c, i) { c.ord = i; }); return out; }
+  // سجلّ البطاقة، وبطاقة «الراوي والمصدر» ترث سجلّ حديثها حتى تُقيَّم أول مرة
+  function rec(key) { return srs[key] || (/:rs$/.test(key) ? srs[key.slice(0, -3)] : null); }
+  function srsOrder(a, b) {
+    var x = rec(a.key) || { due: '', lvl: 0 }, y = rec(b.key) || { due: '', lvl: 0 };
+    return (x.due < y.due ? -1 : x.due > y.due ? 1 : 0) || x.lvl - y.lvl || a.ord - b.ord;
+  }
+  function deckToday() {
+    var cards = flat(memorizedItems());
+    if (Rules.isFriday(today())) return cards;
+    return cards.filter(function (c) { var r = rec(c.key); return !r || r.due <= today(); }).sort(srsOrder).slice(0, 12);
+  }
+  function deckWard(n) { return flat(wardItems(n)); }
+  function frontHTML(c) {
+    var it = c.it, lead = it.lead ? '<span class="lead">' + esc(it.lead) + '</span> ' : '';
+    if (it.type === 'ayah') return '<span class="fc-k">آية</span><p class="fc-intro">' + esc(it.intro) + '</p><p class="quran fc-cue">﴿' + fmt(cueWords(it.text, 3), 'full') + '﴾</p><p class="fc-ask">أكمل الآية</p>';
+    if (it.type === 'note') return '<span class="fc-k">فائدة</span><div class="tx fc-cue">' + fmt(cueWords(it.text, 5), 'full') + '</div><p class="fc-ask">أكمل الفائدة</p>';
+    if (c.kind === 'rs') return '<span class="fc-k">الحديث ' + ar(it.no) + '</span><div class="tx matn fc-cue fc-small">' + lead + fmt(cueWords(it.matn, 16), 'full') + '</div><p class="fc-ask">من راويه؟ ومن أخرجه؟</p>';
+    return '<span class="fc-k">الحديث ' + ar(it.no) + '</span><div class="tx fc-nar">' + fmt(it.narrator, 'full') + '</div><div class="tx matn fc-cue">' + lead + fmt(cueWords(it.matn, 3), 'full') + '</div><p class="fc-ask">سمّع الحديث ومصدره</p>';
+  }
+  function backHTML(c) {
+    var it = c.it;
+    if (c.kind === 'rs') return '<span class="fc-k">الحديث ' + ar(it.no) + '، الجواب</span>' + lineHTML('الراوي', fmt(it.narrator, 'full'), '', 'full', 'r') + lineHTML('المصدر', fmt(it.source, 'full'), '', 'full', 's');
+    return '<span class="fc-k">' + itemLabel(it) + '، ' + pagesTxt([it.page]) + '</span>' + itemBody(it, 'full', null);
+  }
+  function dueDays(key, g) {
+    var d = dueBy(addDays(today(), nextDays(key, g)));
+    return Math.max(1, Math.round((new Date(d) - new Date(today())) / 864e5));
+  }
+  function daysTxt(n) { return n === 1 ? 'غدًا' : n === 2 ? 'بعد يومين' : 'بعد ' + ar(n) + (n <= 10 ? ' أيام' : ' يومًا'); }
+  function nextDays(key, g) {
+    var r = rec(key) || { lvl: 0 };
+    if (g === 0) return 1;
+    if (g === 1) return INT[r.lvl];                            // بأخطاء يسيرة: يبقى في درجته
+    return INT[Math.min(r.lvl + 1, INT.length - 1)];
+  }
+  function gradeCard(c, g) {
+    if (!done(c.it.ward)) return;                              // تدريب قبل إنجاز الورد: لا يغيّر مواعيد المراجعة
+    var r = Object.assign({ lvl: 0 }, rec(c.key)), d = nextDays(c.key, g);
+    if (g === 0) r.lvl = 0; else if (g === 2) r.lvl = Math.min(r.lvl + 1, INT.length - 1);
+    r.due = dueBy(addDays(today(), d)); r.last = today();
+    srs[c.key] = r; saveSrs();
+  }
+  function startCards(deck, n) {
+    var list, title;
+    if (deck === 'today') { list = deckToday(); title = Rules.isFriday(today()) ? 'مراجعة الجمعة' : 'مراجعة اليوم'; }
+    else if (deck === 'ward') { var w = n ? ward(n) : currentWard(); list = deckWard(w.n); title = 'بطاقات الورد ' + ar(w.n); }
+    else { list = shuffle(flat(memorizedItems())).slice(0, 20); title = 'كل محفوظي'; }
+    if (!list.length) return toast('لا بطاقات هنا بعد');
+    S.fc = { list: list.map(function (c) { return { key: c.key, it: c.it, kind: c.kind, rep: 0 }; }), i: 0, flipped: false, title: title, tally: [0, 0, 0], weak: [] };
+    if (S.tab !== 'review') location.hash = '#review'; else render();
+    window.scrollTo(0, 0);
+  }
+  function renderCards() {
+    var F = S.fc, c = F.list[F.i];
+    if (!c) return renderCardsDone();
+    var practice = !done(c.it.ward);
+    var h = '<div class="fc-top"><button class="icon-btn" type="button" data-act="fc-end" aria-label="إنهاء البطاقات">✕</button>' +
+      '<div class="fc-prog" role="progressbar" aria-valuemin="0" aria-valuemax="' + F.list.length + '" aria-valuenow="' + F.i + '"><i style="width:' + Math.round(F.i / F.list.length * 100) + '%"></i></div>' +
+      '<span class="num small">' + ar(F.i + 1) + ' / ' + ar(F.list.length) + '</span></div>';
+    h += '<p class="fc-title">' + esc(F.title) + (practice ? '، تدريب' : '') + '</p>';
+    h += '<div class="fc-stage"><div class="fc fc-enter' + (F.flipped ? ' flipped' : '') + '" id="fc" role="button" tabindex="0" aria-label="بطاقة، المس لقلبها">' +
+      '<div class="fc-in"><div class="fc-face fc-front"' + (F.flipped ? ' inert' : '') + '>' + frontHTML(c) + '<div class="fc-hintbox" hidden></div><p class="fc-hint">المس البطاقة لقلبها</p></div>' +
+      '<div class="fc-face fc-back" aria-live="polite"' + (F.flipped ? '' : ' inert') + '>' + backHTML(c) + '</div></div>' +
+      '<span class="fc-tag fc-tag-ok" aria-hidden="true">أتقنته</span><span class="fc-tag fc-tag-no" aria-hidden="true">لم أتذكر</span></div></div>';
+    h += '<div id="fcCtl">' + cardControls(c) + '</div>';
     view.innerHTML = h;
+    bindCard();
+  }
+  function cardControls(c) {
+    if (!S.fc.flipped) return '<button class="btn wide" type="button" data-act="fc-flip">سمّعت، اقلب البطاقة</button>' +
+      (S.fc.hinted ? '' : '<button class="btn ghost wide fc-hintbtn" type="button" data-act="fc-hint">تلميح: أوائل الكلمات</button>');
+    var practice = !done(c.it.ward);
+    return '<p class="fc-q">قارن بما سمّعت: كيف كان؟</p><div class="fc-grade">' +
+      [[2, 'أتقنته'], [1, 'بأخطاء يسيرة'], [0, 'لم أتذكر']].filter(function (g) { return !(g[0] === 2 && S.fc.hinted); }).map(function (g) {
+        return '<button class="g' + g[0] + '" type="button" data-act="fc-grade" data-g="' + g[0] + '">' + g[1] + (practice ? '' : '<small>' + daysTxt(dueDays(c.key, g[0])) + '</small>') + '</button>';
+      }).join('') + '</div><p class="fc-hint2">' + (S.fc.hinted ? 'استعنت بالتلميح، فأعلى تقييم «بأخطاء يسيرة».' : 'أو اسحب البطاقة: يمينًا «أتقنته»، ويسارًا «لم أتذكر»') + '</p>';
+  }
+  function flipCard(to) {
+    var el = $('#fc'); if (!el || !S.fc) return;
+    S.fc.flipped = to == null ? !S.fc.flipped : to;
+    el.classList.remove('fc-enter');
+    el.classList.toggle('flipped', S.fc.flipped);
+    $('.fc-front').inert = S.fc.flipped; $('.fc-back').inert = !S.fc.flipped;
+    $('#fcCtl').innerHTML = cardControls(S.fc.list[S.fc.i]);
+    if (S.fc.flipped) { var b = $('.fc-back'); if (b && b.getBoundingClientRect().top < 60) el.scrollIntoView({ block: 'start', behavior: 'smooth' }); }
+  }
+  function hintText(c) {
+    var it = c.it;
+    if (c.kind === 'rs') return 'الراوي: ' + fmt(it.narrator, 'first') + '<br>المصدر: ' + fmt(it.source, 'first');
+    return fmt(it.type === 'hadith' ? it.matn : it.text, 'first');
+  }
+  function showHint() {
+    var F = S.fc, c = F.list[F.i], box = $('.fc-hintbox'); if (!box) return;
+    F.hinted = true;
+    box.innerHTML = hintText(c); box.className = 'fc-hintbox ' + (c.it.type === 'ayah' ? 'quran' : 'tx'); box.hidden = false;
+    $('#fcCtl').innerHTML = cardControls(c);
+  }
+  function gradeAndNext(g, dir) {
+    var F = S.fc, c = F.list[F.i], el = $('#fc');
+    gradeCard(c, g); F.tally[g]++;
+    if (g < 2 && F.weak.indexOf(c) < 0) F.weak.push(c);
+    if (g === 0 && c.rep < 2) { c.rep++; F.list.push(c); }      // ما لم يُتذكر يعود في آخر الجلسة
+    var go = function () { F.i++; F.flipped = false; F.hinted = false; renderCards(); window.scrollTo(0, 0); };
+    if (el && !reduceMotion()) {
+      el.style.transition = 'transform .28s ease-in, opacity .28s ease-in';
+      el.style.transform = 'translateX(' + (dir || (g === 2 ? 1 : g === 0 ? -1 : 0)) * 130 + '%) rotate(' + (dir || (g === 2 ? 1 : -1)) * 14 + 'deg)';
+      el.style.opacity = '0';
+      setTimeout(go, 240);
+    } else go();
+  }
+  function reduceMotion() { return matchMedia('(prefers-reduced-motion: reduce)').matches; }
+  function bindCard() {
+    var el = $('#fc'); if (!el) return;
+    var x0 = null, y0 = 0, dx = 0, pid = null, dragging = false, t0 = 0;
+    var ok = $('.fc-tag-ok'), no = $('.fc-tag-no');
+    el.addEventListener('pointerdown', function (e) { if (e.button) return; t0 = performance.now(); x0 = e.clientX; y0 = e.clientY; dx = 0; pid = e.pointerId; dragging = false; });
+    el.addEventListener('pointermove', function (e) {
+      if (x0 === null || e.pointerId !== pid || !S.fc.flipped) return;
+      dx = e.clientX - x0;
+      if (!dragging && Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(e.clientY - y0)) { dragging = true; try { el.setPointerCapture(pid); } catch (er) {} el.style.transition = 'none'; }
+      if (!dragging) return;
+      el.style.transform = 'translateX(' + dx + 'px) rotate(' + dx / 22 + 'deg)';
+      ok.style.opacity = S.fc.hinted ? 0 : Math.max(0, Math.min(1, dx / 100)); no.style.opacity = Math.max(0, Math.min(1, -dx / 100));
+    });
+    function end(e) {
+      if (x0 === null || (e && e.pointerId !== pid)) return;
+      var wasDrag = dragging; x0 = null; dragging = false;
+      if (!wasDrag) return;
+      var far = Math.abs(dx) > el.offsetWidth * 0.35 || (Math.abs(dx) > 40 && Math.abs(dx) / (performance.now() - t0) > 0.5);
+      if (far && dx > 0 && !S.fc.hinted) return gradeAndNext(2, 1);
+      if (far && dx < 0) return gradeAndNext(0, -1);
+      el.style.transition = 'transform .25s ease-out'; el.style.transform = ''; ok.style.opacity = 0; no.style.opacity = 0;
+      el.dataset.dragged = '1'; setTimeout(function () { delete el.dataset.dragged; }, 50);
+    }
+    el.addEventListener('pointerup', end); el.addEventListener('pointercancel', end);
+    el.addEventListener('click', function (e) { if (el.dataset.dragged || e.target.closest('a')) return; flipCard(); });
+    el.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flipCard(); } });
+  }
+  function renderCardsDone() {
+    var F = S.fc, t = F.tally, total = t[0] + t[1] + t[2];
+    var h = '<section class="card fc-done"><div class="fc-ring" aria-hidden="true">✓</div><h2>أتممت ' + esc(F.title) + '</h2>' +
+      '<div class="fc-sum"><div class="s2"><b>' + ar(t[2]) + '</b><span>أتقنته</span></div><div class="s1"><b>' + ar(t[1]) + '</b><span>بأخطاء يسيرة</span></div><div class="s0"><b>' + ar(t[0]) + '</b><span>لم أتذكر</span></div></div>' +
+      '<p class="muted small">' + (t[0] + t[1] ? 'ما تعثّرت فيه يعود إليك قريبًا، فالتكرار المتباعد يثبّته.' : 'ما شاء الله، أتقنت كل البطاقات.') + '</p>' +
+      (F.weak.length ? '<button class="btn soft wide" type="button" data-act="fc-weak">أعد ما تعثّرت فيه (' + ar(F.weak.length) + ')</button>' : '') +
+      '<button class="btn wide" type="button" data-act="fc-end">العودة إلى المراجعة</button></section>';
+    view.innerHTML = h;
+    if (total) toast('أحسنت، ' + ar(total) + ' ' + cardsWord(total));
   }
   function shuffle(a) { a = a.slice(); for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
   function makeQuestion() {
@@ -385,6 +554,7 @@
     else if (['home', 'session', 'review', 'stats'].indexOf(h) >= 0) { if (h === 'session' && S.tab !== 'session') { S.w = null; S.idx = 0; S.seg = 0; } setTab(h); }
     else setTab('home');
     if (S.tab !== 'session' && S.focus) stopFocus();
+    if (S.tab !== 'review') { S.fc = null; S.quiz = null; }
     render(); window.scrollTo(0, 0);
   }
   window.addEventListener('hashchange', route);
@@ -430,14 +600,18 @@
       S.rankTrack = b.dataset.track;
       Api.call('rank', { track: S.rankTrack }).then(function (res) { ME.rank = res.rank; var card = $('#rankCard'); if (card) card.outerHTML = renderRankCard(); }).catch(function (err) { toast(err.message); });
     }
-    else if (a === 'review-start') { S.review = { list: dueItems(), i: 0, shown: false }; render(); }
-    else if (a === 'show') { S.review.shown = true; render(); }
-    else if (a === 'grade') {
-      srsGrade(S.review.list[S.review.i].id, b.dataset.ok === '1');
-      if (S.review.i < S.review.list.length - 1) { S.review.i++; S.review.shown = false; } else { S.review = null; toast('أتممت مراجعة اليوم'); }
-      render();
+    else if (a === 'fc-start') {
+      if (b.dataset.deck === 'pick') {
+        sheet('<h2>بطاقات أي ورد</h2><div class="stack">' + D.wards.filter(function (x) { return opened(x) && wardItems(x.n).length; }).map(function (x) {
+          return '<button class="btn soft wide" type="button" data-act="fc-start" data-deck="ward" data-n="' + x.n + '">الورد ' + ar(x.n) + '، ' + pagesTxt(x.pages) + (done(x.n) ? ' ✓' : '') + '</button>';
+        }).join('') + '</div><button class="btn ghost" type="button" data-act="close">إلغاء</button>');
+      } else { closeSheet(); startCards(b.dataset.deck, +b.dataset.n || S.w || 0); }
     }
-    else if (a === 'review-end') { S.review = null; render(); }
+    else if (a === 'fc-flip') flipCard(true);
+    else if (a === 'fc-hint') showHint();
+    else if (a === 'fc-grade') gradeAndNext(+b.dataset.g);
+    else if (a === 'fc-weak') { var wk = S.fc.weak; S.fc = { list: wk.map(function (c) { return { key: c.key, it: c.it, kind: c.kind, rep: 0 }; }), i: 0, flipped: false, title: 'ما تعثّرت فيه', tally: [0, 0, 0], weak: [] }; render(); window.scrollTo(0, 0); }
+    else if (a === 'fc-end') { S.fc = null; render(); }
     else if (a === 'quiz-start') { S.quiz = { n: 0, right: 0, cur: makeQuestion() }; render(); }
     else if (a === 'pick') { var Q = S.quiz.cur; Q.picked = +b.dataset.i; Q.answered = true; quizResult(Q.opts[Q.picked] === Q.right); render(); }
     else if (a === 'quiz-show') { S.quiz.cur.answered = true; render(); }
@@ -446,6 +620,10 @@
     else if (a === 'quiz-end') { toast('صواب ' + ar(S.quiz.right) + ' من ' + ar(S.quiz.n)); S.quiz = null; render(); }
   });
   document.addEventListener('keydown', function (e) {
+    if (S.fc && S.tab === 'review' && $('#fc')) {         // لوحة المفاتيح: المسافة تقلب، و١ ٢ ٣ تقيّم
+      if (S.fc.flipped && /^[123]$/.test(e.key) && !(e.key === '3' && S.fc.hinted)) { gradeAndNext(+e.key - 1); return; }
+      if (e.key === ' ' && !/^(BUTTON|INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) { e.preventDefault(); flipCard(); return; }
+    }
     var r = e.target.closest && e.target.closest('[data-reveal].hide');
     if (r && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); reveal(r); }
   });
